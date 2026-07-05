@@ -1,0 +1,36 @@
+{
+  "expo": {
+    "name": "xuexi",
+    "slug": "xuexi",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "xuexi",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "backgroundColor": "#0B0B12",
+    "assetBundlePatterns": [
+      "assets/db/**",
+      "assets/audio/**",
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.xuexi.app"
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-sqlite",
+      [
+        "expo-av",
+        { "microphonePermission": false }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
