@@ -1,10 +1,10 @@
 import { Redirect, Tabs } from 'expo-router';
 import React from 'react';
-import { Text } from 'react-native';
+import { Text, type ColorValue } from 'react-native';
 import { useApp } from '../../src/stores/appStore';
 import { colors } from '../../src/theme';
 
-function Icon({ label, color }: { label: string; color: string }) {
+function Icon({ label, color }: { label: string; color: ColorValue }) {
   return <Text style={{ fontSize: 20, color }}>{label}</Text>;
 }
 

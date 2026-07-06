@@ -63,6 +63,12 @@ await page.getByText('Tone Dojo').first().waitFor({ timeout: 4000 });
 // Tabs present?
 await page.getByText('Feed').first().waitFor({ timeout: 4000 });
 
+// Start a Dojo round: exercises the audio_refs data (empty refs would throw)
+// and the expo-audio playback path.
+await page.getByText('Start').first().click();
+await page.getByText('tap to replay').waitFor({ timeout: 5000 });
+await page.getByText('1 flat').click(); // answer once (right or wrong both fine)
+
 // Visit each tab and confirm it renders something meaningful.
 await page.getByText('Reviews').first().click();
 await page.getByText('Show answer').waitFor({ timeout: 5000 }); // a review is preloaded

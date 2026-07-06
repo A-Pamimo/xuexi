@@ -1,7 +1,7 @@
 /**
- * Canonical SQLite schema for xuexi. This DDL is the single source of truth used
- * both by the build-time seed pipeline (better-sqlite3, scripts/build-seed) and
- * by the native runtime store (expo-sqlite, store.native impl).
+ * Canonical SQLite schema for xuexi. This DDL is the single source of truth for
+ * the build-time seed pipeline (better-sqlite3, scripts/build-seed), which ships
+ * the resulting DB in assets and a JSON snapshot the runtime store hydrates from.
  *
  * Immutable CONTENT tables (words, sentences, audio_refs) are populated by the
  * pipeline and shipped in assets/db/xuexi-seed.db. Mutable PROGRESS tables

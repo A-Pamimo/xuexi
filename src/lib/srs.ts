@@ -76,7 +76,8 @@ function toFsrs(card: Card): FsrsCard {
     lapses: card.lapses,
     state: card.state as State,
     last_review: card.lastReview ? new Date(card.lastReview) : undefined,
-    learning_steps: 0,
+    // ?? 0 keeps progress blobs saved before this field existed loadable.
+    learning_steps: card.learningSteps ?? 0,
   } as FsrsCard;
 }
 
@@ -93,6 +94,7 @@ function fromFsrs(
     reps: f.reps,
     lapses: f.lapses,
     state: f.state,
+    learningSteps: f.learning_steps,
     lastReview: f.last_review ? f.last_review.toISOString() : null,
     createdAt:
       typeof createdAt === 'string' ? createdAt : createdAt.toISOString(),

@@ -23,11 +23,7 @@
     },
     "plugins": [
       "expo-router",
-      "expo-sqlite",
-      [
-        "expo-av",
-        { "microphonePermission": false }
-      ]
+      "expo-audio"
     ],
     "experiments": {
       "typedRoutes": true

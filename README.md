@@ -50,6 +50,7 @@ The app ships with content + audio already generated (`assets/db`, `assets/audio
 npm test          # jest: FSRS, pinyin, gamification, feed selection
 npm run typecheck # tsc --noEmit (strict mode)
 node scripts/smoke-web.mjs   # headless: cold-load + onboarding→dojo→tabs, asserts <10s & no JS errors
+npm run deps:check           # deprecation scan of all direct deps + npm outdated + expo-doctor
 ```
 
 Verification status (spec `<verification>`):
@@ -88,8 +89,26 @@ is hydrated from a bundled snapshot generated from the canonical SQLite DB
 (`assets/db/xuexi-seed.db`). Mutable progress (FSRS cards, sessions, tone
 results, stats) is kept in memory for synchronous reads and written through to a
 platform adapter — `expo-file-system` on native, `localStorage` on web. This
-keeps the app identical and fully offline on iOS and web without depending on the
-`expo-sqlite` web (wasm) path (see plan risk R1).
+keeps the app identical and fully offline on iOS and web without a runtime
+SQLite/wasm dependency.
+
+### Upgrade seams (deprecation protection)
+
+Platform APIs are deliberately confined to single adapter files, so SDK churn
+never ripples into feature code:
+
+| Seam | File | Current backend |
+|---|---|---|
+| Audio playback | `src/lib/audio.ts` | `expo-audio` (migrated off deprecated `expo-av`) |
+| Progress persistence | `src/lib/db/persistence.ts` | `expo-file-system` `File`/`Paths` API (new API, not `/legacy`) + `localStorage` on web |
+| Haptics | `src/lib/juice.ts` | `expo-haptics`, lazy-required, no-op on web |
+| Scheduler | `src/lib/srs.ts` | `ts-fsrs` v5 (behavior locked by `srs.test.ts`) |
+
+Before/after any SDK bump run: `npm run deps:check`, `npm test`,
+`npm run typecheck`, `npm run export:web`, then `node scripts/smoke-web.mjs`.
+The pinned SDK-compatible versions for any Expo release live in
+`node_modules/expo/bundledNativeModules.json` — useful when `expo install --fix`
+can't reach `api.expo.dev`.
 
 ## Content pipelines (build-time only)
 

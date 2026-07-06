@@ -223,6 +223,9 @@ async function main() {
   writeDb(words, sentences);
   writeJsonSnapshot(words, sentences);
   process.stdout.write('  wrote assets/db/xuexi-seed.db + src/data/seed.json\n');
+  process.stdout.write(
+    '  NOTE: audio_refs are now empty — run `npm run audio:build` (or use `npm run content:build`).\n',
+  );
 }
 
 main().catch((err) => {

@@ -41,6 +41,8 @@ export interface Card {
   lapses: number;
   /** ts-fsrs State enum value (New=0, Learning=1, Review=2, Relearning=3). */
   state: number;
+  /** Position within the (re)learning steps (ts-fsrs v5). 0 for Review-state cards. */
+  learningSteps: number;
   /** ISO timestamp of last review, null if never reviewed. */
   lastReview: string | null;
   createdAt: string;

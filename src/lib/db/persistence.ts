@@ -2,7 +2,10 @@
  * Platform persistence for the mutable progress blob (cards, sessions, tone
  * results, user stats). Content is immutable and comes from the bundled seed;
  * only this small blob needs writing. Native uses the app's document directory
- * (expo-file-system); web uses localStorage. Both are fully offline.
+ * via expo-file-system's File/Directory API (the modern default since SDK 54 —
+ * the old functional API now lives in expo-file-system/legacy and is on the
+ * deprecation path); web uses localStorage. Both are fully offline, and this
+ * file is the app's single file-system seam.
  */
 import { Platform } from 'react-native';
 
@@ -34,21 +37,21 @@ function webPersistence(): Persistence {
 
 function nativePersistence(): Persistence {
   // Lazy require so web bundles never pull in expo-file-system.
-  const FileSystem = require('expo-file-system') as typeof import('expo-file-system');
-  const path = `${FileSystem.documentDirectory}${KEY}.json`;
+  const { File, Paths } = require('expo-file-system') as typeof import('expo-file-system');
+  const file = () => new File(Paths.document, `${KEY}.json`);
   return {
     async load() {
       try {
-        const info = await FileSystem.getInfoAsync(path);
-        if (!info.exists) return null;
-        return await FileSystem.readAsStringAsync(path);
+        const f = file();
+        if (!f.exists) return null;
+        return await f.text();
       } catch {
         return null;
       }
     },
     async save(json) {
       try {
-        await FileSystem.writeAsStringAsync(path, json);
+        file().write(json);
       } catch {
         /* best-effort */
       }
