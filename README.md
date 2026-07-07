@@ -106,13 +106,31 @@ enriched with per-character decomposition from
 generated from a hand-verified beginner vocabulary pool (correct pinyin, gloss and
 English inflection), each linked to its real word rows for tap-to-gloss.
 
-**Audio.** The pipeline is **provider-pluggable**. The spec's documented default
-is **edge-tts** (multiple `zh-CN` neural voices); set `XUEXI_TTS=edge` on a
-machine that can reach it. It defaults to the offline **espeak-ng** provider,
-which needs no network at build *or* runtime and yields ≥3 distinct speaker
-variants per tone — clips are downsampled and bundled. UI sound effects are
-synthesized procedurally. `XUEXI_AUDIO_FULL=1` generates word audio for every
-HSK1 word (larger bundle).
+**Audio.** The pipeline is **provider-pluggable** (`XUEXI_TTS`). The default is
+**`qwen`** — [Qwen3-TTS-12Hz-0.6B-CustomVoice](https://github.com/QwenLM/Qwen3-TTS)
+(Alibaba, Apache-2.0), the newest Chinese open-source neural TTS (Jan 2026). It
+produces natural, fully-intelligible Mandarin with three built-in Chinese speakers
+(Serena/Vivian/Uncle_Fu) for high-variability tone training. Because the model
+speaks real hanzi with their true citation tone, the Tone Dojo drills a
+hand-verified set of common single characters (no neutral-tone particles, no
+sandhi/polyphonic chars) — every clip is a genuine syllable with an authoritative
+tone label. Clips are resampled to 16 kHz mono and bundled fully offline.
+
+Setup (one-time, ~5 GB; needs an NVIDIA GPU or falls back to slow CPU):
+
+```bash
+py -3.12 -m venv scripts/.cache/qwen-venv
+scripts/.cache/qwen-venv/Scripts/python -m pip install -U pip qwen-tts soundfile "huggingface_hub[cli]" \
+  torch --index-url https://download.pytorch.org/whl/cu124
+scripts/.cache/qwen-venv/Scripts/huggingface-cli download \
+  Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice --local-dir scripts/.cache/qwen-model
+npm run audio:build            # XUEXI_TTS=qwen is the default
+```
+
+Fallback: **`XUEXI_TTS=espeak`** uses the offline espeak-ng formant synthesizer —
+no network/GPU and tiny, but robotic and only marginally intelligible; kept as a
+last resort. UI sound effects are synthesized procedurally in either provider.
+`XUEXI_AUDIO_FULL=1` generates word audio for every HSK1 word (larger bundle).
 
 ### Notes on this build environment
 
@@ -122,15 +140,17 @@ fallbacks that a normal dev machine can swap back:
 - **Tatoeba** (intended sentence source, CC-BY) — `downloads.tatoeba.org` is
   blocked, so sentences are generated (well-suited to strict i+1). A Tatoeba
   ingestion module can be added under `scripts/build-seed`.
-- **edge-tts** — Microsoft's TTS endpoint is blocked, so audio defaults to
-  offline espeak-ng.
+- **Audio** — the default `qwen` provider (Qwen3-TTS) requires a local Python
+  venv + downloaded weights (see setup above). On a machine without them, use
+  `XUEXI_TTS=espeak` for the offline formant-synth fallback.
 
 ## Attributions & licenses
 
 - CC-CEDICT-derived data via complete-hsk-vocabulary — CC BY-SA.
 - makemeahanzi character data — LGPL / Arphic PL.
 - Tatoeba (when enabled) — CC BY 2.0 FR.
-- Audio generated at build time with espeak-ng (GPL tool; generated audio bundled).
+- Audio generated at build time with [Qwen3-TTS](https://github.com/QwenLM/Qwen3-TTS)
+  (Apache-2.0); espeak-ng (GPL) fallback. Generated clips are bundled.
 
 ## Not in this MVP
 

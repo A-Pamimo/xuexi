@@ -26,13 +26,18 @@ function sourceFor(assetKey: string): number | { uri: string } | null {
   return typeof entry === 'string' ? { uri: entry } : entry;
 }
 
-/** Play one bundled clip. Optional rate shifts pitch (used for combo escalation). */
+/**
+ * Play one bundled clip. Optional rate shifts pitch (used for combo escalation).
+ * Returns `true` if a clip was found and playback started — callers use this to
+ * show real feedback (a "playing" pulse) or an "audio unavailable" state instead
+ * of failing silently.
+ */
 export async function playAsset(
   assetKey: string,
   opts: { rate?: number; volume?: number } = {},
-): Promise<void> {
+): Promise<boolean> {
   const source = sourceFor(assetKey);
-  if (!source) return;
+  if (!source) return false;
   await ensureMode();
   try {
     const { sound } = await Audio.Sound.createAsync(source, {
@@ -48,19 +53,25 @@ export async function playAsset(
         void sound.unloadAsync();
       }
     });
+    return true;
   } catch {
-    /* best-effort playback */
+    return false; // web autoplay lock, decode error, etc. — surface to caller
   }
 }
 
-/** Play a queue of clips back-to-back (feed sentence = its word clips). */
-export async function playSequence(assetKeys: string[]): Promise<void> {
+/**
+ * Play a queue of clips back-to-back (feed sentence = its word clips). Resolves
+ * `true` if at least one clip played.
+ */
+export async function playSequence(assetKeys: string[]): Promise<boolean> {
   await ensureMode();
+  let playedAny = false;
   for (const key of assetKeys) {
     const source = sourceFor(key);
     if (!source) continue;
     try {
       const { sound } = await Audio.Sound.createAsync(source, { shouldPlay: true });
+      playedAny = true;
       await new Promise<void>((resolve) => {
         sound.setOnPlaybackStatusUpdate((status) => {
           if (status.isLoaded && status.didJustFinish) {
@@ -73,4 +84,5 @@ export async function playSequence(assetKeys: string[]): Promise<void> {
       /* skip a bad clip */
     }
   }
+  return playedAny;
 }
