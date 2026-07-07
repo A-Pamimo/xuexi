@@ -5,13 +5,13 @@
  */
 import { useRouter } from 'expo-router';
 import React, { useMemo, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
-import { Body, Button, Card, H1, Screen } from '../../components/ui';
+import { StyleSheet, View } from 'react-native';
+import { Body, Button, Caption, Card, H1, PlayButton, ProgressBar, Screen } from '../../components/ui';
 import { Hanzi, Pinyin } from '../../components/chinese';
 import * as juice from '../../lib/juice';
 import type { Rating } from '../../lib/types';
 import { useApp } from '../../stores/appStore';
-import { colors, font, radius, spacing } from '../../theme';
+import { colors, font, radius, readableOn, spacing } from '../../theme';
 import { playWord } from '../shared/play';
 
 const RATINGS: { rating: Rating; label: string; variant: 'bad' | 'ghost' | 'good' }[] = [
@@ -66,23 +66,24 @@ export function ReviewScreen() {
   }
 
   const rate = (rating: Rating) => {
-    const { reward } = reviewWord(item.word.id, rating);
     const success = rating !== 'again';
+    const nextCombo = success ? combo + 1 : 0;
+    const { reward, gained } = reviewWord(item.word.id, rating, nextCombo);
     if (success) {
-      const nextCombo = combo + 1;
       setCombo(nextCombo);
       setMaxCombo((m) => Math.max(m, nextCombo));
       if (nextCombo > 1) juice.comboTick(nextCombo);
       else juice.correct();
       if (reward.multiplier > 1) {
+        // Earned at a combo milestone — never random (research guardrail #4).
         juice.reward();
-        setFlash(`${reward.golden ? '🌟 GOLDEN ' : ''}${reward.multiplier}× XP!`);
+        setFlash(`${reward.golden ? '🌟' : '🔥'} combo ${nextCombo} · ${reward.multiplier}× XP!`);
       }
     } else {
       setCombo(0);
       juice.wrong();
     }
-    setGainedXp((x) => x + (rating === 'again' ? 2 : 10));
+    setGainedXp((x) => x + gained);
     setTimeout(() => setFlash(null), 700);
     setRevealed(false);
     setIdx((i) => i + 1);
@@ -91,18 +92,23 @@ export function ReviewScreen() {
   return (
     <Screen>
       <View style={styles.header}>
-        <Body dim>
-          {idx + 1}/{queue.length}
-        </Body>
+        <Caption>
+          {idx + 1} / {queue.length}
+        </Caption>
         <ComboMeter combo={combo} />
+      </View>
+      <View style={{ marginTop: spacing(1) }}>
+        <ProgressBar value={queue.length ? idx / queue.length : 0} height={6} />
       </View>
 
       <Card style={styles.prompt}>
         {mode === 'audio' && !revealed ? (
-          <Pressable onPress={() => playWord(store, item.word.id)} style={styles.audioBtn}>
-            <Body style={{ fontSize: 64 }}>🔊</Body>
-            <Body dim>Tap to replay</Body>
-          </Pressable>
+          <PlayButton
+            size={48}
+            hint="tap to replay"
+            play={() => playWord(store, item.word.id)}
+            accessibilityLabel="Play the word, then guess its meaning"
+          />
         ) : (
           <Hanzi text={item.word.hanzi} size={item.word.hanzi.length > 2 ? font.hanziM : font.hanziXL} />
         )}
@@ -110,12 +116,15 @@ export function ReviewScreen() {
         {revealed ? (
           <View style={styles.answer}>
             <Pinyin numbered={item.word.pinyinNumbered} size={22} />
-            <Body style={{ marginTop: spacing(1), textAlign: 'center' }}>
+            <Body style={{ marginTop: spacing(1.5), textAlign: 'center' }}>
               {item.word.glossEn}
             </Body>
-            <Pressable onPress={() => playWord(store, item.word.id)} style={{ marginTop: spacing(1) }}>
-              <Body dim>🔊 play</Body>
-            </Pressable>
+            <PlayButton
+              size={24}
+              style={{ marginTop: spacing(2) }}
+              play={() => playWord(store, item.word.id)}
+              accessibilityLabel="Play word audio"
+            />
           </View>
         ) : null}
       </Card>
@@ -150,11 +159,15 @@ export function ReviewScreen() {
 }
 
 function ComboMeter({ combo }: { combo: number }) {
-  if (combo < 2) return <Body dim>combo 0</Body>;
+  if (combo < 2) return <Caption>no combo yet</Caption>;
   const milestone = combo >= 10;
+  const bg = milestone ? colors.accent : colors.primaryDim;
   return (
-    <View style={[styles.combo, milestone && { backgroundColor: colors.accent }]}>
-      <Body style={{ fontWeight: '800', color: '#fff' }}>🔥 {combo}</Body>
+    <View
+      style={[styles.combo, { backgroundColor: bg }]}
+      accessibilityLabel={`Combo ${combo}${milestone ? ', on fire' : ''}`}
+    >
+      <Body style={{ fontWeight: '800', color: readableOn(bg), fontSize: 14 }}>🔥 {combo}</Body>
     </View>
   );
 }

@@ -6,17 +6,18 @@
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
-import { Body, Button, H1, Screen } from '../../components/ui';
+import { Body, Button, Caption, Display, H1, PlayButton, ProgressBar, Screen } from '../../components/ui';
 import { playAsset } from '../../lib/audio';
 import * as juice from '../../lib/juice';
 import type { AudioRef, ToneNumber } from '../../lib/types';
+import { accuracyByTone, speakerTierFor } from '../../lib/toneAdaptive';
 import { useApp } from '../../stores/appStore';
-import { colors, radius, spacing, toneColor } from '../../theme';
+import { colors, radius, spacing, toneColor, TONE_NAMES } from '../../theme';
 import { ToneContour } from './ToneContour';
 
 const SESSION_MS = 60_000;
 const QUESTION_MS = 3500;
-const TONE_NAMES = ['1 flat', '2 rising', '3 dip', '4 falling'];
+const TONE_LABELS = ['1 · flat', '2 · rising', '3 · dip', '4 · falling'];
 
 interface Question {
   ref: AudioRef;
@@ -29,9 +30,11 @@ export function ToneDojoScreen() {
   const recordTone = useApp((s) => s.recordTone);
   const addToneSeconds = useApp((s) => s.addToneSeconds);
 
-  const syllableRefs = useRef<AudioRef[]>(
+  const allSyllableRefs = useRef<AudioRef[]>(
     store.audioRefs.filter((r) => r.ownerType === 'syllable' && r.tone != null),
   );
+  const sessionRefs = useRef<AudioRef[]>(allSyllableRefs.current);
+  const [voiceTier, setVoiceTier] = useState<1 | 2 | 3>(1);
   const [phase, setPhase] = useState<'idle' | 'playing' | 'done'>('idle');
   const [q, setQ] = useState<Question | null>(null);
   const [feedback, setFeedback] = useState<{ correct: boolean; tone: ToneNumber } | null>(null);
@@ -46,7 +49,7 @@ export function ToneDojoScreen() {
   const locked = useRef(false);
 
   const nextQuestion = useCallback(() => {
-    const refs = syllableRefs.current;
+    const refs = sessionRefs.current.length ? sessionRefs.current : allSyllableRefs.current;
     const ref = refs[Math.floor(Math.random() * refs.length)]!;
     const syllable = ref.ownerKey.replace(/[1-5]$/, '');
     const question: Question = { ref, syllable, tone: ref.tone as ToneNumber };
@@ -58,6 +61,11 @@ export function ToneDojoScreen() {
   }, []);
 
   const start = () => {
+    // Scaffold speaker variability to proven accuracy (research P0-2): beginners
+    // train on one voice; mastery widens the pool. Fixed for the whole session.
+    const { tier, allowed } = speakerTierFor(store.toneResults());
+    sessionRefs.current = allSyllableRefs.current.filter((r) => allowed.includes(r.speakerId));
+    setVoiceTier(tier);
     setPhase('playing');
     setScore({ correct: 0, total: 0 });
     setCombo(0);
@@ -72,6 +80,7 @@ export function ToneDojoScreen() {
       if (!q || locked.current) return;
       locked.current = true;
       const correct = chosen === q.tone;
+      const nextCombo = correct ? combo + 1 : 0;
       setScore((s) => ({ correct: s.correct + (correct ? 1 : 0), total: s.total + 1 }));
       setFeedback({ correct, tone: q.tone });
       recordTone(
@@ -84,12 +93,12 @@ export function ToneDojoScreen() {
           timestamp: new Date().toISOString(),
         },
         correct,
+        nextCombo,
       );
       if (correct) {
-        const nc = combo + 1;
-        setCombo(nc);
-        setMaxCombo((m) => Math.max(m, nc));
-        nc > 1 ? juice.comboTick(nc) : juice.correct();
+        setCombo(nextCombo);
+        setMaxCombo((m) => Math.max(m, nextCombo));
+        nextCombo > 1 ? juice.comboTick(nextCombo) : juice.correct();
       } else {
         setCombo(0);
         juice.wrong();
@@ -126,12 +135,13 @@ export function ToneDojoScreen() {
   if (phase === 'idle') {
     return (
       <Screen center>
-        <H1>🥋 Tone Dojo</H1>
-        <Body dim style={{ textAlign: 'center', marginVertical: spacing(2) }}>
+        <Display>🥋</Display>
+        <H1>Tone Dojo</H1>
+        <Body dim style={{ textAlign: 'center', marginVertical: spacing(2), maxWidth: 320 }}>
           Hear a syllable, tap its tone before the bar empties. Many speakers,
           fast rounds. 60 seconds — go!
         </Body>
-        <Button label="Start" onPress={start} />
+        <Button label="Start" onPress={start} style={{ alignSelf: 'stretch' }} />
       </Screen>
     );
   }
@@ -141,14 +151,14 @@ export function ToneDojoScreen() {
     const allTime = allTimeAccuracy(store);
     return (
       <Screen center>
+        <Display>{acc >= 80 ? '🎉' : '💪'}</Display>
         <H1>Time!</H1>
-        <Body style={{ marginTop: spacing(1) }}>
+        <Body style={{ marginTop: spacing(1), textAlign: 'center' }}>
           {score.correct}/{score.total} correct · {acc}% · best combo {maxCombo}
         </Body>
-        <Body dim style={{ marginTop: spacing(1) }}>
-          All-time accuracy: {allTime}%
-        </Body>
-        <Button label="Go again" onPress={start} style={{ marginTop: spacing(3) }} />
+        <Caption style={{ marginTop: spacing(1) }}>All-time accuracy: {allTime}%</Caption>
+        <ToneBreakdown />
+        <Button label="Go again" onPress={start} style={{ marginTop: spacing(3), alignSelf: 'stretch' }} />
       </Screen>
     );
   }
@@ -163,9 +173,16 @@ export function ToneDojoScreen() {
       </View>
 
       {/* per-question timer bar */}
-      <View style={styles.timerTrack}>
-        <View style={[styles.timerFill, { width: `${qProgress * 100}%` }]} />
+      <View style={{ marginTop: spacing(1) }}>
+        <ProgressBar
+          value={qProgress}
+          height={8}
+          color={qProgress < 0.3 ? colors.bad : colors.primary}
+        />
       </View>
+      <Caption style={{ marginTop: spacing(0.5) }}>
+        🎙️ {voiceTier} of 3 voices{voiceTier < 3 ? ' · widens as you improve' : ' · full variability'}
+      </Caption>
 
       <View style={styles.center}>
         {feedback ? (
@@ -182,10 +199,12 @@ export function ToneDojoScreen() {
             <ToneContour tone={feedback.tone} size={160} />
           </View>
         ) : (
-          <Pressable onPress={() => q && void playAsset(q.ref.assetKey)} style={{ alignItems: 'center' }}>
-            <Body style={{ fontSize: 72 }}>🔊</Body>
-            <Body dim>tap to replay</Body>
-          </Pressable>
+          <PlayButton
+            size={56}
+            hint="tap to replay"
+            play={() => (q ? playAsset(q.ref.assetKey) : false)}
+            accessibilityLabel="Replay the syllable"
+          />
         )}
       </View>
 
@@ -193,12 +212,14 @@ export function ToneDojoScreen() {
         {([1, 2, 3, 4] as ToneNumber[]).map((t) => (
           <Pressable
             key={t}
+            accessibilityRole="button"
+            accessibilityLabel={`Tone ${t}, ${TONE_NAMES[t - 1]}`}
             disabled={!!feedback}
             onPress={() => answer(t)}
             style={[styles.toneBtn, { borderColor: toneColor(t) }]}
           >
             <ToneContour tone={t} size={70} />
-            <Body style={{ color: toneColor(t), fontWeight: '700' }}>{TONE_NAMES[t - 1]}</Body>
+            <Body style={{ color: toneColor(t), fontWeight: '800', fontSize: 15 }}>{TONE_LABELS[t - 1]}</Body>
           </Pressable>
         ))}
       </View>
@@ -213,6 +234,30 @@ function allTimeAccuracy(store: ReturnType<typeof useApp.getState>['store']): nu
   return Math.round((correct / results.length) * 100);
 }
 
+/** Per-tone accuracy with trend — competence feedback (research U2). */
+function ToneBreakdown() {
+  const store = useApp((s) => s.store)!;
+  const rows = accuracyByTone(store.toneResults());
+  if (!rows.some((r) => r.pct !== null)) return null;
+  return (
+    <View style={styles.breakdown}>
+      {rows.map((r) => (
+        <View key={r.tone} style={styles.breakdownRow}>
+          <Body style={{ color: toneColor(r.tone), fontSize: 14 }}>
+            Tone {r.tone} · {TONE_NAMES[r.tone - 1]}
+          </Body>
+          <Body dim style={{ fontSize: 14 }}>
+            {r.pct === null ? '—' : `${Math.round(r.pct * 100)}%`}
+            {r.delta !== null && Math.abs(r.delta) >= 0.01
+              ? ` ${r.delta > 0 ? '▲' : '▼'}${Math.abs(Math.round(r.delta * 100))}`
+              : ''}
+          </Body>
+        </View>
+      ))}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   top: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: spacing(1) },
   timerTrack: {
@@ -223,6 +268,8 @@ const styles = StyleSheet.create({
   },
   timerFill: { height: 8, backgroundColor: colors.primary },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  breakdown: { marginTop: spacing(2), alignSelf: 'stretch', gap: spacing(0.75) },
+  breakdownRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   tones: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
   toneBtn: {
     width: '48%',

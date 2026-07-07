@@ -6,9 +6,9 @@
 import React, { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import Svg, { Rect } from 'react-native-svg';
-import { Body, Card, H1, Screen } from '../../components/ui';
+import { Body, Caption, Card, Display, H1, H2, ProgressBar, Screen } from '../../components/ui';
 import { Hanzi } from '../../components/chinese';
-import { levelProgress } from '../../lib/gamification';
+import { levelProgress, rollingHitRate } from '../../lib/gamification';
 import { isKnown } from '../../lib/srs';
 import { State } from 'ts-fsrs';
 import { useApp, today } from '../../stores/appStore';
@@ -37,8 +37,10 @@ export function StatsScreen() {
         <View style={styles.rowStats}>
           <Stat big={`${stats.streak}`} label="🔥 day streak" />
           <Stat big={`${knownCount}`} label="words known" />
-          <Stat big={`${stats.streakFreezes}`} label="❄️ freezes" />
+          <Stat big={`${stats.streakFreezes}`} label="🛡️ protection" />
         </View>
+
+        <HitRate />
 
         <Card style={{ marginTop: spacing(2) }}>
           <View style={styles.levelRow}>
@@ -57,7 +59,7 @@ export function StatsScreen() {
           </View>
         </Card>
 
-        <Body style={styles.section}>Collection ({learned.length})</Body>
+        <View style={styles.section}><H2>Collection ({learned.length})</H2></View>
         <Card>
           {learned.length === 0 ? (
             <Body dim>Tap words in the feed or do reviews to fill your grid.</Body>
@@ -78,7 +80,7 @@ export function StatsScreen() {
           )}
         </Card>
 
-        <Body style={styles.section}>This week</Body>
+        <View style={styles.section}><H2>This week</H2></View>
         <Card>
           <WeeklyRecap />
         </Card>
@@ -162,13 +164,34 @@ function WeeklyRecap() {
   );
 }
 
+/** Forgiving rolling consistency (research P0-4 / U6) — a missed day is not total loss. */
+function HitRate() {
+  const store = useApp((s) => s.store)!;
+  const hr = rollingHitRate(store.allSessions(), today());
+  if (hr.window === 0) return null;
+  const pct = Math.round(hr.rate * 100);
+  return (
+    <Card style={{ marginTop: spacing(2) }}>
+      <View style={styles.levelRow}>
+        <Body style={{ fontWeight: '800' }}>Consistency</Body>
+        <Body dim>
+          {hr.active} of {hr.window} days · {pct}%
+        </Body>
+      </View>
+      <ProgressBar value={hr.rate} color={colors.good} />
+      <Caption style={{ marginTop: spacing(1) }}>
+        Life happens — a missed day won&apos;t erase your progress, and a freeze protects your streak
+        for 24h.
+      </Caption>
+    </Card>
+  );
+}
+
 function Stat({ big, label }: { big: string; label: string }) {
   return (
     <Card style={styles.stat}>
-      <Body style={{ fontSize: 28, fontWeight: '800' }}>{big}</Body>
-      <Body dim style={{ fontSize: font.small, textAlign: 'center' }}>
-        {label}
-      </Body>
+      <Body style={{ fontSize: 28, fontWeight: '900' }}>{big}</Body>
+      <Caption style={{ textAlign: 'center' }}>{label}</Caption>
     </Card>
   );
 }
@@ -186,7 +209,7 @@ const styles = StyleSheet.create({
   odoNumber: { fontSize: 46, fontWeight: '900', color: colors.primary, marginVertical: spacing(0.5) },
   rowStats: { flexDirection: 'row', gap: spacing(1), marginTop: spacing(2) },
   stat: { flex: 1, alignItems: 'center', paddingVertical: spacing(2) },
-  section: { marginTop: spacing(3), marginBottom: spacing(1), fontWeight: '800', fontSize: font.body },
+  section: { marginTop: spacing(3), marginBottom: spacing(1) },
   levelRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: spacing(1) },
   xpTrack: { height: 12, backgroundColor: colors.surfaceAlt, borderRadius: radius.pill, overflow: 'hidden' },
   xpFill: { height: 12, backgroundColor: colors.primary },
