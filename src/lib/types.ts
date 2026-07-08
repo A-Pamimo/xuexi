@@ -16,7 +16,14 @@ export interface Word {
   tonePattern: ToneNumber[];
   glossEn: string;
   hskLevel: number; // 1..6 (seed ships 1..3)
+  /** Written-corpus frequency rank (complete-hsk-vocabulary), lower = more frequent. */
   frequencyRank: number | null;
+  /**
+   * SPOKEN-frequency rank from SUBTLEX-CH (subtitle contextual-diversity), lower =
+   * more frequent in real speech. Primary sequencing axis for introducing new
+   * vocabulary; null for words absent from SUBTLEX-CH.
+   */
+  spokenFreqRank: number | null;
   /** Component / radical breakdown per character, for mnemonic teaching. */
   componentBreakdown: ComponentBreakdown[];
 }

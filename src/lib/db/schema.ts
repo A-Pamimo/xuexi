@@ -8,7 +8,7 @@
  * (cards, tone_drill_results, session_logs, user_stats) start empty and are
  * written at runtime.
  */
-export const SEED_VERSION = 1;
+export const SEED_VERSION = 2;
 
 export const SCHEMA_SQL = /* sql */ `
 PRAGMA journal_mode = WAL;
@@ -25,7 +25,8 @@ CREATE TABLE IF NOT EXISTS words (
   tone_pattern TEXT NOT NULL,          -- JSON array of tone numbers
   gloss_en TEXT NOT NULL,
   hsk_level INTEGER NOT NULL,
-  frequency_rank INTEGER,
+  frequency_rank INTEGER,              -- written-corpus rank
+  spoken_frequency_rank INTEGER,       -- SUBTLEX-CH spoken (subtitle) rank
   component_breakdown TEXT NOT NULL    -- JSON array of ComponentBreakdown
 );
 CREATE INDEX IF NOT EXISTS idx_words_hsk ON words(hsk_level);

@@ -40,6 +40,7 @@ export interface QueueItem {
 
 interface AppState {
   ready: boolean;
+  initError: boolean;
   rev: number;
   onboarded: boolean;
   stats: UserStats;
@@ -76,6 +77,7 @@ function requireStore(s: Store | null): Store {
 
 export const useApp = create<AppState>((set, get) => ({
   ready: false,
+  initError: false,
   rev: 0,
   onboarded: false,
   stats: {
@@ -92,13 +94,19 @@ export const useApp = create<AppState>((set, get) => ({
 
   async init() {
     if (get().ready) return;
-    const store = await Store.open();
-    set({
-      store,
-      ready: true,
-      onboarded: store.isOnboarded(),
-      stats: store.getStats(),
-    });
+    try {
+      const store = await Store.open();
+      set({
+        store,
+        ready: true,
+        onboarded: store.isOnboarded(),
+        stats: store.getStats(),
+      });
+    } catch (e) {
+      // Seed/persistence load failed — surface an error instead of an infinite spinner.
+      console.error('xuexi init failed:', e);
+      set({ initError: true });
+    }
   },
 
   bump() {
@@ -137,11 +145,13 @@ export const useApp = create<AppState>((set, get) => ({
       if (w) items.push({ word: w, card: c, isNew: c.reps === 0 });
       if (items.length >= limit) return items;
     }
-    // Not enough due — introduce new words (never opens to an empty session).
+    // Not enough due — introduce new words (never opens to an empty session),
+    // in SPOKEN-frequency order (research P0-1) so learners meet the words that
+    // dominate real speech first; words absent from SUBTLEX-CH come last.
     if (items.length < limit) {
       const carded = new Set(cards.map((c) => c.wordId));
-      for (const w of store.words) {
-        if (carded.has(w.id)) continue;
+      const fresh = store.words.filter((w) => !carded.has(w.id)).sort(bySpokenFreq);
+      for (const w of fresh) {
         items.push({ word: w, card: newCard(w.id), isNew: true });
         if (items.length >= limit) break;
       }
@@ -248,6 +258,11 @@ export const useApp = create<AppState>((set, get) => ({
 
 function countKnown(store: Store): number {
   return store.allCards().filter(isKnown).length;
+}
+
+/** Order words by SUBTLEX-CH spoken-frequency rank; unranked words sort last. */
+export function bySpokenFreq(a: Word, b: Word): number {
+  return (a.spokenFreqRank ?? Infinity) - (b.spokenFreqRank ?? Infinity);
 }
 
 function maybeStreak(store: Store, stats: UserStats, day: string): UserStats {
