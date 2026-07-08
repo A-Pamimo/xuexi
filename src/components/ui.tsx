@@ -1,9 +1,10 @@
 /** Shared UI primitives. All render sensibly on web (react-native-web). */
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
   Easing,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -12,6 +13,10 @@ import {
   type TextStyle,
   type ViewStyle,
 } from 'react-native';
+
+// react-native-web's Animated ignores the native driver (and can warn); keep it
+// off on web, on everywhere else.
+const NATIVE_DRIVER = Platform.OS !== 'web';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, elevation, font, HIT, radius, readableOn, spacing, type } from '../theme';
 
@@ -175,10 +180,14 @@ export function PlayButton({
   const pulse = () => {
     scale.setValue(1);
     Animated.sequence([
-      Animated.timing(scale, { toValue: 1.18, duration: 120, easing: Easing.out(Easing.quad), useNativeDriver: true }),
-      Animated.spring(scale, { toValue: 1, friction: 4, useNativeDriver: true }),
+      Animated.timing(scale, { toValue: 1.18, duration: 120, easing: Easing.out(Easing.quad), useNativeDriver: NATIVE_DRIVER }),
+      Animated.spring(scale, { toValue: 1, friction: 4, useNativeDriver: NATIVE_DRIVER }),
     ]).start();
   };
+  // Clear the pending "no audio" reset if the button unmounts mid-timeout.
+  useEffect(() => () => {
+    if (failTimer.current) clearTimeout(failTimer.current);
+  }, []);
 
   const onPress = async () => {
     if (failTimer.current) clearTimeout(failTimer.current);

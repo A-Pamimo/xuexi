@@ -6,6 +6,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   FlatList,
+  Platform,
   Pressable,
   StyleSheet,
   useWindowDimensions,
@@ -38,6 +39,17 @@ export function FeedScreen() {
   const [showPinyin, setShowPinyin] = useState(true);
   const [selected, setSelected] = useState<Word | null>(null);
 
+  // Web blocks autoplay until a user gesture; don't fire scroll-to-play until then
+  // (otherwise it silently no-ops). Native is unlocked from the start.
+  const audioUnlocked = useRef(Platform.OS !== 'web');
+  const [audioLocked, setAudioLocked] = useState(Platform.OS === 'web');
+  const unlockAudio = useCallback(() => {
+    if (!audioUnlocked.current) {
+      audioUnlocked.current = true;
+      setAudioLocked(false);
+    }
+  }, []);
+
   const feed = useMemo(() => {
     const known = knownWordIds();
     const due = new Set(
@@ -61,7 +73,7 @@ export function FeedScreen() {
 
   const onViewable = useRef(({ viewableItems }: { viewableItems: ViewToken[] }) => {
     const first = viewableItems[0]?.item as Sentence | undefined;
-    if (first) playSentence(store, first);
+    if (first && audioUnlocked.current) void playSentence(store, first);
   }).current;
 
   const tokenize = useCallback(
@@ -120,7 +132,7 @@ export function FeedScreen() {
                     key={idx}
                     accessibilityRole="button"
                     accessibilityLabel={`${tok.text}, tap for meaning and to add to reviews`}
-                    onPress={() => { juice.tap(); noteGloss(tok.word!.id); setSelected(tok.word); }}
+                    onPress={() => { unlockAudio(); juice.tap(); noteGloss(tok.word!.id); setSelected(tok.word); }}
                   >
                     <Body style={styles.tokenWord}>{tok.text}</Body>
                   </Pressable>
@@ -142,10 +154,12 @@ export function FeedScreen() {
             <PlayButton
               size={34}
               style={{ marginTop: spacing(3) }}
-              play={() => playSentence(store, item)}
+              play={() => { unlockAudio(); return playSentence(store, item); }}
               accessibilityLabel="Play sentence audio"
             />
-            <Caption style={{ marginTop: spacing(3) }}>tap underlined words · swipe up ↑</Caption>
+            <Caption style={{ marginTop: spacing(3) }}>
+              {audioLocked ? 'tap 🔊 to enable audio' : 'tap underlined words · swipe up ↑'}
+            </Caption>
           </View>
         )}
       />
@@ -155,7 +169,7 @@ export function FeedScreen() {
           accessibilityRole="switch"
           accessibilityState={{ checked: showPinyin }}
           accessibilityLabel="Toggle pinyin"
-          onPress={() => setShowPinyin((p) => !p)}
+          onPress={() => { unlockAudio(); setShowPinyin((p) => !p); }}
         >
           <Pill tone={showPinyin ? 'active' : 'default'}>
             <Body style={{ fontWeight: '700', fontSize: 14 }}>Pinyin {showPinyin ? 'on' : 'off'}</Body>

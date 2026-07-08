@@ -47,6 +47,12 @@ export function ToneDojoScreen() {
   const questionStart = useRef(0);
   const askedAt = useRef(0);
   const locked = useRef(false);
+  const advanceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Clear the pending question-advance timer on unmount so it never fires
+  // nextQuestion() on an unmounted screen (React state-update warning on web).
+  useEffect(() => () => {
+    if (advanceTimer.current) clearTimeout(advanceTimer.current);
+  }, []);
 
   const nextQuestion = useCallback(() => {
     const refs = sessionRefs.current.length ? sessionRefs.current : allSyllableRefs.current;
@@ -103,7 +109,8 @@ export function ToneDojoScreen() {
         setCombo(0);
         juice.wrong();
       }
-      setTimeout(() => {
+      if (advanceTimer.current) clearTimeout(advanceTimer.current);
+      advanceTimer.current = setTimeout(() => {
         if (Date.now() - questionStart.current < SESSION_MS) nextQuestion();
       }, 650);
     },
