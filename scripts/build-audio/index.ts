@@ -106,7 +106,7 @@ const TONE_DRILL: { syllable: string; tone: ToneNumber; hanzi: string }[] = [
 ];
 
 interface Seed {
-  words: { id: number; hanzi: string; hskLevel: number }[];
+  words: { id: number; hanzi: string; hskLevel: number; spokenFreqRank: number | null }[];
   sentences: { id: number; wordIds: number[] }[];
   audioRefs: unknown[];
 }
@@ -175,11 +175,24 @@ function buildJobs(seed: Seed, provider: Provider): Job[] {
   //    HSK1 word — larger bundle, documented in the README.
   const wordIds = new Set<number>();
   for (const s of seed.sentences) for (const id of s.wordIds) wordIds.add(id);
+  // Cover the Learn pool: the top-N spoken-frequency words are the ones the Learn
+  // flow introduces, so they need pronunciation audio. (On web, clips are fetched
+  // on demand, so this only grows the on-disk asset set, not the initial download.)
+  const topN = Number(process.env.XUEXI_AUDIO_TOP ?? 800);
+  for (const w of seed.words) {
+    if (w.spokenFreqRank != null && w.spokenFreqRank <= topN) wordIds.add(w.id);
+  }
   if (process.env.XUEXI_AUDIO_FULL === '1') {
     for (const w of seed.words) if (w.hskLevel === 1) wordIds.add(w.id);
   }
+  // Generate the most-common words first, so a partial/interrupted build still
+  // covers the words the Learn flow introduces earliest.
+  const orderedIds = [...wordIds].sort(
+    (a, b) =>
+      (wordById.get(a)?.spokenFreqRank ?? Infinity) - (wordById.get(b)?.spokenFreqRank ?? Infinity),
+  );
   const speaker0 = speakers[0]!;
-  for (const id of wordIds) {
+  for (const id of orderedIds) {
     const w = wordById.get(id);
     if (!w) continue;
     jobs.push({
@@ -259,7 +272,12 @@ function main() {
   }
   process.stdout.write(`TTS provider: ${provider}\n`);
 
-  fs.rmSync(OUT, { recursive: true, force: true });
+  // Keep existing clips by default so a killed/interrupted batch can resume
+  // (qwen_synth skips already-synthesized outputs). Set XUEXI_AUDIO_CLEAN=1 to
+  // force a from-scratch rebuild (e.g. after shrinking the inventory).
+  if (process.env.XUEXI_AUDIO_CLEAN === '1') {
+    fs.rmSync(OUT, { recursive: true, force: true });
+  }
   fs.mkdirSync(OUT, { recursive: true });
 
   const seedPath = path.join(ROOT, 'src/data/seed.json');

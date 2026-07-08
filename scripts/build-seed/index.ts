@@ -130,6 +130,32 @@ function breakdownFor(hanzi: string, mmah: Map<string, MmahEntry>): ComponentBre
   });
 }
 
+/**
+ * Pick the most useful reading of a polyphonic entry. CC-CEDICT lists rare
+ * readings first (说 → shuì "persuade" before shuō "speak"), and the old build
+ * blindly took forms[0], giving wrong pinyin AND wrong glosses. Prefer the form
+ * with the most real senses (the common reading is the richer entry).
+ */
+function bestForm(forms: HskEntry['forms']): HskEntry['forms'][number] | undefined {
+  let best: HskEntry['forms'][number] | undefined;
+  let bestScore = -1;
+  for (const f of forms) {
+    const senses = (f.meanings ?? []).filter((m) => !/^variant of/i.test(m));
+    if (senses.length > bestScore) {
+      bestScore = senses.length;
+      best = f;
+    }
+  }
+  return best ?? forms[0];
+}
+
+/** Trim a leading "(qualifier)" / "(bound form)" so glosses read as plain meanings. */
+function cleanGloss(m: string): string {
+  const s = m.trim();
+  const lead = s.match(/^\([^)]*\)\s*(.+)$/);
+  return (lead && lead[1] && lead[1].length > 2 ? lead[1] : s).trim();
+}
+
 async function buildWords(mmah: Map<string, MmahEntry>): Promise<{
   words: Word[];
   posByHanzi: Map<string, string[]>;
@@ -143,9 +169,12 @@ async function buildWords(mmah: Map<string, MmahEntry>): Promise<{
     const entries = JSON.parse(raw) as HskEntry[];
     for (const e of entries) {
       if (seen.has(e.simplified)) continue;
-      const numeric = e.forms[0]?.transcriptions?.numeric;
-      const meaning = e.forms.flatMap((f) => f.meanings ?? [])[0];
-      if (!numeric || !meaning) continue;
+      const form = bestForm(e.forms);
+      const numeric = form?.transcriptions?.numeric;
+      const rawMeaning =
+        (form?.meanings ?? []).find((m) => !/^variant of/i.test(m)) ?? form?.meanings?.[0];
+      if (!numeric || !rawMeaning) continue;
+      const meaning = cleanGloss(rawMeaning);
       seen.add(e.simplified);
       posByHanzi.set(e.simplified, e.pos ?? []);
       words.push({

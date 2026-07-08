@@ -164,6 +164,12 @@ def main() -> int:
         language = item.get("language", "Chinese")
         speaker = item["speaker"]
         out = item["out"]
+        # Resume: skip clips already synthesized (lets a killed batch restart from
+        # where it stopped instead of regenerating everything).
+        if os.path.exists(out) and os.path.getsize(out) > 1024:
+            print(json.dumps({"i": i + 1, "n": total, "out": os.path.basename(out),
+                              "skipped": True}), flush=True)
+            continue
         # plausible upper bound on speech duration for this text (CJK char count).
         nchar = max(1, sum(1 for c in text if "一" <= c <= "鿿"))
         max_dur = 1.4 + 1.0 * nchar  # 1 char -> 2.4s, 2 chars -> 3.4s (catches 3-30s rambles;
