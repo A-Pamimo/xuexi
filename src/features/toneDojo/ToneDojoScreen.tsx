@@ -5,9 +5,10 @@
  * escalating pitch, haptics + sound via juice.ts. ~60s sessions.
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Body, Button, Caption, Display, H1, PlayButton, ProgressBar, Screen } from '../../components/ui';
-import { playAsset } from '../../lib/audio';
+import { playAsset, stopAudio } from '../../lib/audio';
 import * as juice from '../../lib/juice';
 import type { AudioRef, ToneNumber } from '../../lib/types';
 import { accuracyByTone, speakerTierFor } from '../../lib/toneAdaptive';
@@ -48,11 +49,23 @@ export function ToneDojoScreen() {
   const askedAt = useRef(0);
   const locked = useRef(false);
   const advanceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Clear the pending question-advance timer on unmount so it never fires
-  // nextQuestion() on an unmounted screen (React state-update warning on web).
+  // On unmount: clear the pending question-advance timer (no state-update on an
+  // unmounted screen) and stop any playing tone (audio must not linger on exit).
   useEffect(() => () => {
     if (advanceTimer.current) clearTimeout(advanceTimer.current);
+    void stopAudio();
   }, []);
+
+  // Tabs stay mounted, so leaving the Dojo tab wouldn't otherwise stop the round.
+  // End the round + silence audio on blur so a tone never keeps playing after you
+  // navigate away.
+  useFocusEffect(
+    useCallback(() => () => {
+      if (advanceTimer.current) clearTimeout(advanceTimer.current);
+      void stopAudio();
+      setPhase((p) => (p === 'playing' ? 'idle' : p));
+    }, []),
+  );
 
   const nextQuestion = useCallback(() => {
     const refs = sessionRefs.current.length ? sessionRefs.current : allSyllableRefs.current;
@@ -126,6 +139,8 @@ export function ToneDojoScreen() {
       setSessionLeft(left);
       if (left <= 0) {
         clearInterval(id);
+        if (advanceTimer.current) clearTimeout(advanceTimer.current);
+        void stopAudio(); // round over — silence the last tone
         addToneSeconds(Math.round(SESSION_MS / 1000));
         setPhase('done');
         return;

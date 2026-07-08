@@ -26,6 +26,33 @@ function sourceFor(assetKey: string): number | { uri: string } | null {
   return typeof entry === 'string' ? { uri: entry } : entry;
 }
 
+// Single playback channel: only one clip sounds at a time, and callers can stop
+// it (on screen exit / session end) so audio never lingers or stacks.
+let current: Audio.Sound | null = null;
+let generation = 0; // bumped on every stop, so in-flight sequences can bail out
+
+async function stopCurrent(): Promise<void> {
+  generation += 1;
+  const s = current;
+  current = null;
+  if (!s) return;
+  try {
+    await s.stopAsync();
+  } catch {
+    /* already stopped/unloaded */
+  }
+  try {
+    await s.unloadAsync();
+  } catch {
+    /* ignore */
+  }
+}
+
+/** Stop any playing/queued clip immediately (call on screen exit or session end). */
+export async function stopAudio(): Promise<void> {
+  await stopCurrent();
+}
+
 /**
  * Play one bundled clip. Optional rate shifts pitch (used for combo escalation).
  * Returns `true` if a clip was found and playback started — callers use this to
@@ -39,17 +66,20 @@ export async function playAsset(
   const source = sourceFor(assetKey);
   if (!source) return false;
   await ensureMode();
+  await stopCurrent(); // never stack over a still-playing clip
   try {
     const { sound } = await Audio.Sound.createAsync(source, {
       shouldPlay: true,
       volume: opts.volume ?? 1,
     });
+    current = sound;
     if (opts.rate && opts.rate !== 1) {
       // shouldCorrectPitch=false => rate also shifts pitch
       await sound.setRateAsync(opts.rate, false);
     }
     sound.setOnPlaybackStatusUpdate((status) => {
       if (status.isLoaded && status.didJustFinish) {
+        if (current === sound) current = null;
         void sound.unloadAsync();
       }
     });
@@ -65,16 +95,21 @@ export async function playAsset(
  */
 export async function playSequence(assetKeys: string[]): Promise<boolean> {
   await ensureMode();
+  await stopCurrent();
+  const myGen = generation; // bail out if a newer play/stop supersedes us
   let playedAny = false;
   for (const key of assetKeys) {
+    if (generation !== myGen) break;
     const source = sourceFor(key);
     if (!source) continue;
     try {
       const { sound } = await Audio.Sound.createAsync(source, { shouldPlay: true });
+      current = sound;
       playedAny = true;
       await new Promise<void>((resolve) => {
         sound.setOnPlaybackStatusUpdate((status) => {
           if (status.isLoaded && status.didJustFinish) {
+            if (current === sound) current = null;
             void sound.unloadAsync();
             resolve();
           }
