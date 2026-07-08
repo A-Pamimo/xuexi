@@ -38,8 +38,8 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="reviews"
         options={{
-          title: 'Reviews',
-          tabBarIcon: ({ color }) => <Icon label="🎯" color={color} />,
+          title: 'Learn',
+          tabBarIcon: ({ color }) => <Icon label="📚" color={color} />,
         }}
       />
       <Tabs.Screen

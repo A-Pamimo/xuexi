@@ -135,28 +135,39 @@ export const useApp = create<AppState>((set, get) => ({
     return new Set(store.allCards().filter(isKnown).map((c) => c.wordId));
   },
 
-  reviewQueue(limit = 20) {
+  // A session = a capped batch of NEW words to learn (taught first) followed by
+  // the due reviews. Capping new items (research P1-2 load protection) keeps the
+  // intro gradual; new words arrive in SPOKEN-frequency order (P0-1) so learners
+  // meet the words that dominate real speech first — basics first, then progress.
+  reviewQueue(limit = 20, maxNew = 8) {
     const store = requireStore(get().store);
     const cards = store.allCards();
-    const due = selectDue(cards);
-    const items: QueueItem[] = [];
-    for (const c of due) {
+    const carded = new Set(cards.map((c) => c.wordId));
+
+    // Due recalls: cards that have actually been studied at least once.
+    const reviews: QueueItem[] = [];
+    for (const c of selectDue(cards)) {
+      if (c.reps === 0) continue; // never-studied added cards are "new", handled below
       const w = store.getWord(c.wordId);
-      if (w) items.push({ word: w, card: c, isNew: c.reps === 0 });
-      if (items.length >= limit) return items;
+      if (w) reviews.push({ word: w, card: c, isNew: false });
     }
-    // Not enough due — introduce new words (never opens to an empty session),
-    // in SPOKEN-frequency order (research P0-1) so learners meet the words that
-    // dominate real speech first; words absent from SUBTLEX-CH come last.
-    if (items.length < limit) {
-      const carded = new Set(cards.map((c) => c.wordId));
-      const fresh = store.words.filter((w) => !carded.has(w.id)).sort(bySpokenFreq);
-      for (const w of fresh) {
-        items.push({ word: w, card: newCard(w.id), isNew: true });
-        if (items.length >= limit) break;
-      }
+
+    // New words to learn: words tapped/added but never studied, then fresh words
+    // in spoken-frequency order — capped so a session never floods with new.
+    const newItems: QueueItem[] = [];
+    for (const c of selectDue(cards)) {
+      if (c.reps !== 0) continue;
+      const w = store.getWord(c.wordId);
+      if (w) newItems.push({ word: w, card: c, isNew: true });
     }
-    return items;
+    const fresh = store.words.filter((w) => !carded.has(w.id)).sort(bySpokenFreq);
+    for (const w of fresh) {
+      if (newItems.length >= maxNew) break;
+      newItems.push({ word: w, card: newCard(w.id), isNew: true });
+    }
+
+    // Learn new first (leads with teaching), then reviews; capped at `limit`.
+    return [...newItems.slice(0, maxNew), ...reviews].slice(0, limit);
   },
 
   dueCount() {

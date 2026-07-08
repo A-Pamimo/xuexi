@@ -131,7 +131,7 @@ export function FeedScreen() {
                   <Pressable
                     key={idx}
                     accessibilityRole="button"
-                    accessibilityLabel={`${tok.text}, tap for meaning and to add to reviews`}
+                    accessibilityLabel={`${tok.text}, tap for meaning and to add to Learn`}
                     onPress={() => { unlockAudio(); juice.tap(); noteGloss(tok.word!.id); setSelected(tok.word); }}
                   >
                     <Body style={styles.tokenWord}>{tok.text}</Body>
@@ -196,7 +196,7 @@ export function FeedScreen() {
             <View style={styles.modalActions}>
               <PlayButton size={26} play={() => playWord(store, selected.id)} accessibilityLabel="Play word audio" />
               <Button
-                label={store.getCard(selected.id) ? 'In reviews ✓' : '＋ Add to reviews'}
+                label={store.getCard(selected.id) ? 'In Learn ✓' : '＋ Add to Learn'}
                 onPress={() => {
                   if (addWord(selected.id)) juice.correct();
                   setSelected(null);
