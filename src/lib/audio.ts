@@ -6,8 +6,21 @@
  * gesture; callers treat playback as best-effort (a tap on any control unlocks
  * it thereafter).
  */
+import { Platform } from 'react-native';
 import { Audio } from 'expo-av';
 import { AUDIO_ASSETS } from '../data/audioAssets';
+
+// Shared audio-unlock flag (single source of truth). Native is unlocked from the
+// start; web stays locked until an explicit user gesture calls unlockAudio(),
+// because browsers block audio until then. Nav SFX and feed autoplay both gate
+// on this so nothing tries (and silently fails) to play before it's allowed.
+let unlocked = Platform.OS !== 'web';
+export function isAudioUnlocked(): boolean {
+  return unlocked;
+}
+export function unlockAudio(): void {
+  unlocked = true;
+}
 
 let configured = false;
 async function ensureMode(): Promise<void> {

@@ -8,8 +8,11 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useFocusEffect } from 'expo-router';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Body, Button, Caption, Display, H1, PlayButton, ProgressBar, Screen } from '../../components/ui';
+import { ScrambleText } from '../../components/ScrambleText';
+import { Ticker } from '../../components/Ticker';
 import { playAsset, stopAudio } from '../../lib/audio';
 import * as juice from '../../lib/juice';
+import { syllableToMarks } from '../../lib/pinyin';
 import type { AudioRef, ToneNumber } from '../../lib/types';
 import { accuracyByTone, speakerTierFor } from '../../lib/toneAdaptive';
 import { useApp } from '../../stores/appStore';
@@ -205,6 +208,11 @@ export function ToneDojoScreen() {
       <Caption style={{ marginTop: spacing(0.5) }}>
         🎙️ {voiceTier} of 3 voices{voiceTier < 3 ? ' · widens as you improve' : ' · full variability'}
       </Caption>
+      {combo >= 5 ? (
+        <View style={{ marginTop: spacing(1) }}>
+          <Ticker text={`🔥 COMBO ×${combo}    `} color={colors.gold} size={14} speed={70} />
+        </View>
+      ) : null}
 
       <View style={styles.center}>
         {feedback ? (
@@ -218,6 +226,18 @@ export function ToneDojoScreen() {
             >
               {feedback.correct ? 'Correct!' : `Tone ${feedback.tone}`}
             </Body>
+            {q ? (
+              <ScrambleText
+                text={syllableToMarks(`${q.syllable}${feedback.tone}`)}
+                kind="pinyin"
+                style={{
+                  color: toneColor(feedback.tone),
+                  fontSize: 34,
+                  fontWeight: '700',
+                  marginTop: spacing(0.5),
+                }}
+              />
+            ) : null}
             <ToneContour tone={feedback.tone} size={160} />
           </View>
         ) : (

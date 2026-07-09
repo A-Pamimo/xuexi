@@ -2,6 +2,8 @@ import { Redirect, Tabs } from 'expo-router';
 import React from 'react';
 import { Text } from 'react-native';
 import { useApp } from '../../src/stores/appStore';
+import { unlockAudio } from '../../src/lib/audio';
+import * as juice from '../../src/lib/juice';
 import { colors } from '../../src/theme';
 
 function Icon({ label, color }: { label: string; color: string }) {
@@ -14,6 +16,14 @@ export default function TabsLayout() {
 
   return (
     <Tabs
+      screenListeners={{
+        // The tab press is exactly the gesture browsers require to unlock audio,
+        // so unlock first, then the soft nav tick actually sounds on web too.
+        tabPress: () => {
+          unlockAudio();
+          juice.nav();
+        },
+      }}
       screenOptions={{
         headerShown: false,
         tabBarStyle: {

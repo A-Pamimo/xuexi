@@ -7,7 +7,7 @@
  * no-ops on web; sound uses bundled SFX via audio.ts so it works everywhere.
  */
 import { Platform } from 'react-native';
-import { playAsset } from './audio';
+import { isAudioUnlocked, playAsset } from './audio';
 
 // Lazy-required so web bundles don't pull native haptics in.
 type Haptics = typeof import('expo-haptics');
@@ -23,6 +23,8 @@ export const JUICE = {
   comboBasePitch: 1.0,
   comboPitchStep: 0.04, // each combo step raises the tick pitch
   comboPitchMax: 2.2,
+  navPitch: 1.8, // reuse sfx_combo pitched up as a soft UI tick
+  navVolume: 0.25,
 };
 
 export function correct(): void {
@@ -58,4 +60,16 @@ export function reward(): void {
 export function tap(): void {
   const h = getHaptics();
   void h?.impactAsync(h.ImpactFeedbackStyle.Light);
+}
+
+/**
+ * Navigation tick — a soft, higher-pitched UI click for true navigation only
+ * (tab switches). Reuses sfx_combo.wav (no new asset). Does NOT unlock audio
+ * itself; callers unlock on the gesture first so the web tick actually sounds.
+ * Kept off scored controls (rating buttons) to avoid double-firing over combos.
+ */
+export function nav(): void {
+  const h = getHaptics();
+  void h?.selectionAsync();
+  if (isAudioUnlocked()) void playAsset('sfx_combo.wav', { rate: JUICE.navPitch, volume: JUICE.navVolume });
 }

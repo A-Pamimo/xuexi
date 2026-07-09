@@ -6,7 +6,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   FlatList,
-  Platform,
   Pressable,
   StyleSheet,
   useWindowDimensions,
@@ -15,6 +14,8 @@ import {
 } from 'react-native';
 import { Body, Button, Caption, H1, Pill, PlayButton, Screen } from '../../components/ui';
 import { Hanzi, Pinyin } from '../../components/chinese';
+import { Ticker } from '../../components/Ticker';
+import { isAudioUnlocked, unlockAudio as unlockAudioGlobal } from '../../lib/audio';
 import * as juice from '../../lib/juice';
 import type { Sentence, Word } from '../../lib/types';
 import { useApp } from '../../stores/appStore';
@@ -31,6 +32,7 @@ export function FeedScreen() {
   const store = useApp((s) => s.store)!;
   const knownWordIds = useApp((s) => s.knownWordIds);
   const dueCount = useApp((s) => s.dueCount);
+  const streak = useApp((s) => s.stats.streak);
   const addFeedSeconds = useApp((s) => s.addFeedSeconds);
   const addWord = useApp((s) => s.addWord);
   const noteGloss = useApp((s) => s.noteGloss);
@@ -40,14 +42,14 @@ export function FeedScreen() {
   const [selected, setSelected] = useState<Word | null>(null);
 
   // Web blocks autoplay until a user gesture; don't fire scroll-to-play until then
-  // (otherwise it silently no-ops). Native is unlocked from the start.
-  const audioUnlocked = useRef(Platform.OS !== 'web');
-  const [audioLocked, setAudioLocked] = useState(Platform.OS === 'web');
+  // (otherwise it silently no-ops). Gating now lives in audio.ts so nav SFX and
+  // the feed share one truth; this local state only drives the caption hint.
+  const [audioLocked, setAudioLocked] = useState(!isAudioUnlocked());
   const unlockAudio = useCallback(() => {
-    if (!audioUnlocked.current) {
-      audioUnlocked.current = true;
-      setAudioLocked(false);
+    if (!isAudioUnlocked()) {
+      unlockAudioGlobal();
     }
+    setAudioLocked(false);
   }, []);
 
   const feed = useMemo(() => {
@@ -73,7 +75,7 @@ export function FeedScreen() {
 
   const onViewable = useRef(({ viewableItems }: { viewableItems: ViewToken[] }) => {
     const first = viewableItems[0]?.item as Sentence | undefined;
-    if (first && audioUnlocked.current) void playSentence(store, first);
+    if (first && isAudioUnlocked()) void playSentence(store, first);
   }).current;
 
   const tokenize = useCallback(
@@ -164,6 +166,12 @@ export function FeedScreen() {
         )}
       />
 
+      {streak >= 3 ? (
+        <View style={styles.streakRibbon} pointerEvents="none">
+          <Ticker text={`🔥 ${streak}-DAY STREAK · KEEP IT ALIVE    `} color={colors.gold} size={13} speed={60} />
+        </View>
+      ) : null}
+
       <View style={styles.overlay} pointerEvents="box-none">
         <Pressable
           accessibilityRole="switch"
@@ -233,6 +241,7 @@ const styles = StyleSheet.create({
     gap: spacing(1),
     alignItems: 'flex-end',
   },
+  streakRibbon: { position: 'absolute', bottom: spacing(1), left: spacing(2), right: spacing(2) },
   modalBg: {
     position: 'absolute',
     top: 0,

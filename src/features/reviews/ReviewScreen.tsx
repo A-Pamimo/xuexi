@@ -10,6 +10,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Body, Button, Caption, Card, H1, Label, PlayButton, ProgressBar, Screen } from '../../components/ui';
 import { Hanzi, Pinyin } from '../../components/chinese';
+import { Ticker } from '../../components/Ticker';
 import { stopAudio } from '../../lib/audio';
 import * as juice from '../../lib/juice';
 import type { Rating, Word } from '../../lib/types';
@@ -135,6 +136,11 @@ export function ReviewScreen() {
           color={isNew ? colors.accent : colors.primary}
         />
       </View>
+      {!isNew && combo >= 5 ? (
+        <View style={{ marginTop: spacing(1) }}>
+          <Ticker text={`🔥 COMBO ×${combo}    `} color={colors.gold} size={14} speed={70} />
+        </View>
+      ) : null}
 
       {isNew ? (
         <Card style={styles.prompt}>
@@ -177,7 +183,7 @@ export function ReviewScreen() {
           )}
           {revealed ? (
             <View style={styles.answer}>
-              <Pinyin numbered={item.word.pinyinNumbered} size={22} />
+              <Pinyin numbered={item.word.pinyinNumbered} size={22} reveal />
               <Body style={{ marginTop: spacing(1.5), textAlign: 'center' }}>{item.word.glossEn}</Body>
               <PlayButton
                 size={24}

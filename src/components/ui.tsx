@@ -19,6 +19,7 @@ import {
 const NATIVE_DRIVER = Platform.OS !== 'web';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, elevation, font, HIT, radius, readableOn, spacing, type } from '../theme';
+import { useReducedMotion } from '../lib/motion';
 
 export function Screen({
   children,
@@ -176,8 +177,10 @@ export function PlayButton({
   const [state, setState] = useState<'idle' | 'playing' | 'unavailable'>('idle');
   const scale = useRef(new Animated.Value(1)).current;
   const failTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const reduced = useReducedMotion();
 
   const pulse = () => {
+    if (reduced) return; // resting scale is already 1 (final state) — no motion
     scale.setValue(1);
     Animated.sequence([
       Animated.timing(scale, { toValue: 1.18, duration: 120, easing: Easing.out(Easing.quad), useNativeDriver: NATIVE_DRIVER }),
