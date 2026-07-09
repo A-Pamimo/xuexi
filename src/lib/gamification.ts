@@ -5,7 +5,7 @@
  * Ethics (spec <ethics>): a streak only counts when the day contained REAL
  * learning (>= 20 reviews OR >= 5 min of feed), never mere app-opens.
  */
-import type { SessionLog, UserStats } from './types';
+import type { Rating, SessionLog, UserStats } from './types';
 
 export const STREAK_MIN_REVIEWS = 20;
 export const STREAK_MIN_FEED_SECONDS = 5 * 60;
@@ -29,17 +29,52 @@ export interface RewardRoll {
   golden: boolean;
 }
 
+const clamp01 = (x: number): number => Math.max(0, Math.min(1, x));
+
 /**
- * Variable reward: ~8% of scored correct answers trigger a 1.5x–5x multiplier;
- * a rare subset are "golden" (cosmetic unlocks). Unpredictability is the point.
- * `rng` is injectable for deterministic tests.
+ * XP for a graded review, weighted by cognitive demand (research U1 / guardrail
+ * #3: reward difficulty & retrieval, never task count or speed). A hard card, or
+ * one recalled when it was nearly forgotten (low retrievability), is worth more
+ * than grinding an easy well-known card. A lapse ("again") earns a flat token.
+ *
+ *   difficulty: ts-fsrs difficulty 1..10 (higher = harder)
+ *   retrievability: probability of recall at review time, 0..1 (lower = shakier)
  */
-export function rollReward(rng: () => number = Math.random): RewardRoll {
-  if (rng() >= 0.08) return { multiplier: 1, golden: false };
-  const tiers = [1.5, 2, 3, 5];
-  const multiplier = tiers[Math.min(tiers.length - 1, Math.floor(rng() * tiers.length))]!;
-  const golden = multiplier === 5 && rng() < 0.25;
-  return { multiplier, golden };
+export function xpForReview(
+  rating: Rating,
+  card: { difficulty: number; retrievability: number },
+): number {
+  if (rating === 'again') return 2;
+  const diffW = 0.6 + clamp01(card.difficulty / 10); // 0.7 (easy) .. 1.6 (hard)
+  const retrW = 1 + (1 - clamp01(card.retrievability)) * 0.6; // 1.0 (fresh) .. 1.6 (nearly forgotten)
+  return Math.max(1, Math.round(10 * diffW * retrW));
+}
+
+/** XP for a tone-drill trial. Misses earn nothing (only genuine success pays). */
+export function xpForTone(correct: boolean): number {
+  return correct ? 5 : 0;
+}
+
+/**
+ * Earned (never random) reward multiplier — research P0-3 / guardrail #4: all
+ * bonuses are performance-contingent, no chance-based slot-machine. Fires as a
+ * burst exactly at combo milestones; "golden" is a high-combo achievement.
+ */
+export function earnedReward(ctx: { combo: number }): RewardRoll {
+  switch (ctx.combo) {
+    case 5:
+      return { multiplier: 1.5, golden: false };
+    case 10:
+      return { multiplier: 2, golden: false };
+    case 15:
+      return { multiplier: 2.5, golden: true };
+    case 20:
+      return { multiplier: 3, golden: true };
+    default:
+      return ctx.combo > 20 && ctx.combo % 10 === 0
+        ? { multiplier: 3, golden: true }
+        : { multiplier: 1, golden: false };
+  }
 }
 
 /** Does today's activity satisfy the streak integrity threshold? */
@@ -79,4 +114,26 @@ export function advanceStreak(stats: UserStats, today: string): UserStats {
     next.streakFreezes = Math.min(3, next.streakFreezes + 1);
   }
   return next;
+}
+
+/**
+ * Forgiving rolling hit-rate (research P0-4 / U6): a "41 of 42 days" measure that
+ * sits alongside the all-or-nothing streak so a single missed day is not framed
+ * as total loss. `window` is capped at days since first activity so new users
+ * aren't punished by an empty denominator.
+ */
+export function rollingHitRate(
+  sessions: SessionLog[],
+  today: string,
+  windowDays = 42,
+): { active: number; window: number; rate: number } {
+  const inWindow = sessions.filter((s) => {
+    const gap = daysBetween(s.date, today);
+    return gap >= 0 && gap < windowDays;
+  });
+  const active = inWindow.filter(dayQualifies).length;
+  const dates = sessions.map((s) => s.date).filter((d) => d <= today).sort();
+  const first = dates[0];
+  const window = first ? Math.min(windowDays, daysBetween(first, today) + 1) : 0;
+  return { active, window, rate: window > 0 ? active / window : 0 };
 }

@@ -3,16 +3,16 @@ import { playAsset, playSequence } from '../../lib/audio';
 import type { Store } from '../../lib/db/store';
 import type { Sentence, ToneNumber } from '../../lib/types';
 
-export function playWord(store: Store, wordId: number): void {
+export function playWord(store: Store, wordId: number): Promise<boolean> {
   const ref = store.audioRefsFor('word', String(wordId))[0];
-  if (ref) void playAsset(ref.assetKey);
+  return ref ? playAsset(ref.assetKey) : Promise.resolve(false);
 }
 
-export function playSentence(store: Store, sentence: Sentence): void {
+export function playSentence(store: Store, sentence: Sentence): Promise<boolean> {
   const keys = sentence.wordIds
     .map((id) => store.audioRefsFor('word', String(id))[0]?.assetKey)
     .filter((k): k is string => !!k);
-  if (keys.length) void playSequence(keys);
+  return keys.length ? playSequence(keys) : Promise.resolve(false);
 }
 
 /** All (syllable+tone) clips across speakers — for the Tone Dojo variability. */

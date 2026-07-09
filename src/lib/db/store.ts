@@ -35,6 +35,8 @@ interface ProgressBlob {
   toneResults: ToneDrillResult[];
   sessions: Record<string, SessionLog>;
   stats: UserStats;
+  /** Times each word has been glossed in the Feed (drives auto-promotion to FSRS). */
+  glossCounts: Record<number, number>;
 }
 
 const DEFAULT_STATS: UserStats = {
@@ -55,6 +57,7 @@ function emptyProgress(): ProgressBlob {
     toneResults: [],
     sessions: {},
     stats: { ...DEFAULT_STATS },
+    glossCounts: {},
   };
 }
 
@@ -126,6 +129,18 @@ export class Store {
   }
   toneResults(): ToneDrillResult[] {
     return this.progress.toneResults;
+  }
+
+  // --- feed gloss counts -----------------------------------------------------
+  glossCount(wordId: number): number {
+    return this.progress.glossCounts[wordId] ?? 0;
+  }
+  /** Record a gloss of `wordId`, returning the new count. */
+  bumpGloss(wordId: number): number {
+    const n = (this.progress.glossCounts[wordId] ?? 0) + 1;
+    this.progress.glossCounts[wordId] = n;
+    this.scheduleSave();
+    return n;
   }
 
   // --- sessions --------------------------------------------------------------

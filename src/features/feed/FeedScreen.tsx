@@ -12,12 +12,14 @@ import {
   View,
   type ViewToken,
 } from 'react-native';
-import { Body, Button, H1, Screen } from '../../components/ui';
+import { Body, Button, Caption, H1, Pill, PlayButton, Screen } from '../../components/ui';
 import { Hanzi, Pinyin } from '../../components/chinese';
+import { Ticker } from '../../components/Ticker';
+import { isAudioUnlocked, unlockAudio as unlockAudioGlobal } from '../../lib/audio';
 import * as juice from '../../lib/juice';
 import type { Sentence, Word } from '../../lib/types';
 import { useApp } from '../../stores/appStore';
-import { colors, font, radius, spacing } from '../../theme';
+import { colors, elevation, font, radius, spacing } from '../../theme';
 import { selectFeed } from './selection';
 import { playSentence, playWord } from '../shared/play';
 
@@ -30,12 +32,25 @@ export function FeedScreen() {
   const store = useApp((s) => s.store)!;
   const knownWordIds = useApp((s) => s.knownWordIds);
   const dueCount = useApp((s) => s.dueCount);
+  const streak = useApp((s) => s.stats.streak);
   const addFeedSeconds = useApp((s) => s.addFeedSeconds);
   const addWord = useApp((s) => s.addWord);
+  const noteGloss = useApp((s) => s.noteGloss);
   const { height } = useWindowDimensions();
 
   const [showPinyin, setShowPinyin] = useState(true);
   const [selected, setSelected] = useState<Word | null>(null);
+
+  // Web blocks autoplay until a user gesture; don't fire scroll-to-play until then
+  // (otherwise it silently no-ops). Gating now lives in audio.ts so nav SFX and
+  // the feed share one truth; this local state only drives the caption hint.
+  const [audioLocked, setAudioLocked] = useState(!isAudioUnlocked());
+  const unlockAudio = useCallback(() => {
+    if (!isAudioUnlocked()) {
+      unlockAudioGlobal();
+    }
+    setAudioLocked(false);
+  }, []);
 
   const feed = useMemo(() => {
     const known = knownWordIds();
@@ -60,7 +75,7 @@ export function FeedScreen() {
 
   const onViewable = useRef(({ viewableItems }: { viewableItems: ViewToken[] }) => {
     const first = viewableItems[0]?.item as Sentence | undefined;
-    if (first) playSentence(store, first);
+    if (first && isAudioUnlocked()) void playSentence(store, first);
   }).current;
 
   const tokenize = useCallback(
@@ -115,7 +130,12 @@ export function FeedScreen() {
             <View style={styles.hanziWrap}>
               {tokenize(item).map((tok, idx) =>
                 tok.word ? (
-                  <Pressable key={idx} onPress={() => { juice.tap(); setSelected(tok.word); }}>
+                  <Pressable
+                    key={idx}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${tok.text}, tap for meaning and to add to Learn`}
+                    onPress={() => { unlockAudio(); juice.tap(); noteGloss(tok.word!.id); setSelected(tok.word); }}
+                  >
                     <Body style={styles.tokenWord}>{tok.text}</Body>
                   </Pressable>
                 ) : (
@@ -130,42 +150,66 @@ export function FeedScreen() {
                 <Pinyin numbered={item.pinyin} size={20} />
               </View>
             ) : null}
-            <Body dim style={{ marginTop: spacing(2), fontSize: font.body }}>
+            <Body dim style={{ marginTop: spacing(2), textAlign: 'center' }}>
               {item.glossEn}
             </Body>
-            <Pressable onPress={() => playSentence(store, item)} style={{ marginTop: spacing(3) }}>
-              <Body style={{ fontSize: 40 }}>🔊</Body>
-            </Pressable>
-            <Body dim style={{ marginTop: spacing(4) }}>
-              swipe up ↑
-            </Body>
+            <PlayButton
+              size={34}
+              style={{ marginTop: spacing(3) }}
+              play={() => { unlockAudio(); return playSentence(store, item); }}
+              accessibilityLabel="Play sentence audio"
+            />
+            <Caption style={{ marginTop: spacing(3) }}>
+              {audioLocked ? 'tap 🔊 to enable audio' : 'tap underlined words · swipe up ↑'}
+            </Caption>
           </View>
         )}
       />
 
-      <View style={styles.overlay} pointerEvents="box-none">
-        <Pressable onPress={() => setShowPinyin((p) => !p)} style={styles.pill}>
-          <Body style={{ fontWeight: '700' }}>{showPinyin ? 'Pinyin ✓' : 'Pinyin ✗'}</Body>
-        </Pressable>
-        <View style={styles.pill}>
-          <Body dim>due {dueCount()}</Body>
+      {streak >= 3 ? (
+        <View style={styles.streakRibbon} pointerEvents="none">
+          <Ticker text={`🔥 ${streak}-DAY STREAK · KEEP IT ALIVE    `} color={colors.gold} size={13} speed={60} />
         </View>
+      ) : null}
+
+      <View style={styles.overlay} pointerEvents="box-none">
+        <Pressable
+          accessibilityRole="switch"
+          accessibilityState={{ checked: showPinyin }}
+          accessibilityLabel="Toggle pinyin"
+          onPress={() => { unlockAudio(); setShowPinyin((p) => !p); }}
+        >
+          <Pill tone={showPinyin ? 'active' : 'default'}>
+            <Body style={{ fontWeight: '700', fontSize: 14 }}>Pinyin {showPinyin ? 'on' : 'off'}</Body>
+          </Pill>
+        </Pressable>
+        <Pill>
+          <Caption>due {dueCount()}</Caption>
+        </Pill>
       </View>
 
       {selected ? (
-        <Pressable style={styles.modalBg} onPress={() => setSelected(null)}>
+        <Pressable
+          style={styles.modalBg}
+          accessibilityViewIsModal
+          accessibilityLabel="Word details"
+          onPress={() => setSelected(null)}
+        >
           <Pressable style={styles.modal} onPress={() => {}}>
             <Hanzi text={selected.hanzi} size={font.hanziL} />
-            <Pinyin numbered={selected.pinyinNumbered} size={22} />
-            <Body style={{ marginTop: spacing(1), textAlign: 'center' }}>{selected.glossEn}</Body>
-            <View style={{ flexDirection: 'row', marginTop: spacing(2), gap: spacing(1) }}>
-              <Button label="🔊 Play" variant="ghost" onPress={() => playWord(store, selected.id)} />
+            <View style={{ marginTop: spacing(1) }}>
+              <Pinyin numbered={selected.pinyinNumbered} size={22} />
+            </View>
+            <Body dim style={{ marginTop: spacing(1.5), textAlign: 'center' }}>{selected.glossEn}</Body>
+            <View style={styles.modalActions}>
+              <PlayButton size={26} play={() => playWord(store, selected.id)} accessibilityLabel="Play word audio" />
               <Button
-                label={store.getCard(selected.id) ? 'In reviews ✓' : '＋ Add to reviews'}
+                label={store.getCard(selected.id) ? 'In Learn ✓' : '＋ Add to Learn'}
                 onPress={() => {
                   if (addWord(selected.id)) juice.correct();
                   setSelected(null);
                 }}
+                style={{ flex: 1 }}
               />
             </View>
           </Pressable>
@@ -195,34 +239,35 @@ const styles = StyleSheet.create({
     top: spacing(6),
     right: spacing(2),
     gap: spacing(1),
+    alignItems: 'flex-end',
   },
-  pill: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.pill,
-    paddingHorizontal: spacing(2),
-    paddingVertical: spacing(1),
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: 'center',
-  },
+  streakRibbon: { position: 'absolute', bottom: spacing(1), left: spacing(2), right: spacing(2) },
   modalBg: {
     position: 'absolute',
     top: 0,
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    backgroundColor: 'rgba(0,0,0,0.7)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: spacing(3),
   },
   modal: {
     backgroundColor: colors.surface,
-    borderRadius: radius.lg,
+    borderRadius: radius.xl,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.borderStrong,
     padding: spacing(3),
     alignItems: 'center',
-    minWidth: 280,
+    minWidth: 300,
+    ...elevation.modal,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: spacing(2.5),
+    gap: spacing(1.5),
+    alignSelf: 'stretch',
   },
 });

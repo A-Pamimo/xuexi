@@ -63,6 +63,25 @@ export function isKnown(card: Card): boolean {
   return card.state !== State.New && card.reps > 0;
 }
 
+// FSRS-4.5 forgetting curve constants (see ts-fsrs); kept local so XP weighting
+// doesn't depend on a specific ts-fsrs helper signature.
+const R_DECAY = -0.5;
+const R_FACTOR = 19 / 81;
+
+/**
+ * Probability the card would be recalled right now (0..1). Used to reward
+ * reviews of nearly-forgotten cards more than freshly-seen ones. A never-studied
+ * card returns 0 (maximally worth learning).
+ */
+export function retrievabilityOf(card: Card, now: Date = new Date()): number {
+  if (!card.lastReview || card.reps === 0 || card.stability <= 0) return 0;
+  const elapsedDays = Math.max(
+    0,
+    (now.getTime() - new Date(card.lastReview).getTime()) / 86_400_000,
+  );
+  return Math.pow(1 + R_FACTOR * (elapsedDays / card.stability), R_DECAY);
+}
+
 // --- conversion between domain Card and ts-fsrs Card -----------------------
 
 function toFsrs(card: Card): FsrsCard {

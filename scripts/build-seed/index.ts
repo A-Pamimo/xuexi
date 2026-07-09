@@ -31,6 +31,10 @@ const HSK_BASE =
   'https://raw.githubusercontent.com/drkameleon/complete-hsk-vocabulary/main/wordlists/exclusive/new';
 const MMAH_URL =
   'https://raw.githubusercontent.com/skishore/makemeahanzi/master/dictionary.txt';
+// SUBTLEX-CH (Cai & Brysbaert 2010) spoken/subtitle word frequencies, via the
+// leonsilicon/subtlex-ch-wf typed-JSON mirror. Cached (~16 MB) at scripts/.cache.
+const SUBTLEX_URL =
+  'https://raw.githubusercontent.com/leonsilicon/subtlex-ch-wf/main/SUBTLEX-CH-WF.json';
 const HSK_LEVELS = [1, 2, 3];
 
 interface HskEntry {
@@ -65,6 +69,40 @@ async function cachedFetch(url: string, file: string): Promise<string> {
   return text;
 }
 
+/**
+ * Load SUBTLEX-CH word → contextual-diversity (W-CD, # of subtitle contexts a
+ * word appears in). W-CD is a better lexical-processing predictor than raw count
+ * (Brysbaert). Returns a hanzi → W-CD map.
+ */
+function loadSubtlex(text: string): Map<string, number> {
+  const map = new Map<string, number>();
+  const parsed = JSON.parse(text) as { data: { Word: string; 'W-CD': number }[] };
+  for (const row of parsed.data) {
+    const wcd = row['W-CD'];
+    if (typeof wcd !== 'number') continue;
+    // Keep the max if a token appears more than once.
+    const prev = map.get(row.Word);
+    if (prev === undefined || wcd > prev) map.set(row.Word, wcd);
+  }
+  return map;
+}
+
+/**
+ * Assign `spokenFreqRank` to each word from SUBTLEX W-CD, WITHOUT reordering the
+ * list (ids must stay stable — FSRS cards are keyed by wordId). Rank 1 = most
+ * spoken-frequent; words absent from SUBTLEX-CH get null (introduced last).
+ */
+function applySpokenFreq(words: Word[], subtlex: Map<string, number>): void {
+  const ranked = words
+    .map((w) => ({ id: w.id, wcd: subtlex.get(w.hanzi) }))
+    .filter((x): x is { id: number; wcd: number } => x.wcd !== undefined)
+    // W-CD desc; ties broken by written-frequency then id for a stable total order.
+    .sort((a, b) => b.wcd - a.wcd || a.id - b.id);
+  const rankById = new Map<number, number>();
+  ranked.forEach((r, i) => rankById.set(r.id, i + 1));
+  for (const w of words) w.spokenFreqRank = rankById.get(w.id) ?? null;
+}
+
 function loadMmah(text: string): Map<string, MmahEntry> {
   const map = new Map<string, MmahEntry>();
   for (const line of text.split('\n')) {
@@ -92,6 +130,32 @@ function breakdownFor(hanzi: string, mmah: Map<string, MmahEntry>): ComponentBre
   });
 }
 
+/**
+ * Pick the most useful reading of a polyphonic entry. CC-CEDICT lists rare
+ * readings first (说 → shuì "persuade" before shuō "speak"), and the old build
+ * blindly took forms[0], giving wrong pinyin AND wrong glosses. Prefer the form
+ * with the most real senses (the common reading is the richer entry).
+ */
+function bestForm(forms: HskEntry['forms']): HskEntry['forms'][number] | undefined {
+  let best: HskEntry['forms'][number] | undefined;
+  let bestScore = -1;
+  for (const f of forms) {
+    const senses = (f.meanings ?? []).filter((m) => !/^variant of/i.test(m));
+    if (senses.length > bestScore) {
+      bestScore = senses.length;
+      best = f;
+    }
+  }
+  return best ?? forms[0];
+}
+
+/** Trim a leading "(qualifier)" / "(bound form)" so glosses read as plain meanings. */
+function cleanGloss(m: string): string {
+  const s = m.trim();
+  const lead = s.match(/^\([^)]*\)\s*(.+)$/);
+  return (lead && lead[1] && lead[1].length > 2 ? lead[1] : s).trim();
+}
+
 async function buildWords(mmah: Map<string, MmahEntry>): Promise<{
   words: Word[];
   posByHanzi: Map<string, string[]>;
@@ -105,9 +169,12 @@ async function buildWords(mmah: Map<string, MmahEntry>): Promise<{
     const entries = JSON.parse(raw) as HskEntry[];
     for (const e of entries) {
       if (seen.has(e.simplified)) continue;
-      const numeric = e.forms[0]?.transcriptions?.numeric;
-      const meaning = e.forms.flatMap((f) => f.meanings ?? [])[0];
-      if (!numeric || !meaning) continue;
+      const form = bestForm(e.forms);
+      const numeric = form?.transcriptions?.numeric;
+      const rawMeaning =
+        (form?.meanings ?? []).find((m) => !/^variant of/i.test(m)) ?? form?.meanings?.[0];
+      if (!numeric || !rawMeaning) continue;
+      const meaning = cleanGloss(rawMeaning);
       seen.add(e.simplified);
       posByHanzi.set(e.simplified, e.pos ?? []);
       words.push({
@@ -118,6 +185,7 @@ async function buildWords(mmah: Map<string, MmahEntry>): Promise<{
         glossEn: meaning,
         hskLevel: level,
         frequencyRank: e.frequency ?? null,
+        spokenFreqRank: null, // filled by applySpokenFreq after SUBTLEX loads
         componentBreakdown: breakdownFor(e.simplified, mmah),
       });
     }
@@ -140,8 +208,8 @@ function writeDb(
   );
 
   const insWord = db.prepare(
-    `INSERT INTO words(id,hanzi,pinyin_numbered,tone_pattern,gloss_en,hsk_level,frequency_rank,component_breakdown)
-     VALUES(@id,@hanzi,@pinyin,@tone,@gloss,@hsk,@freq,@comp)`,
+    `INSERT INTO words(id,hanzi,pinyin_numbered,tone_pattern,gloss_en,hsk_level,frequency_rank,spoken_frequency_rank,component_breakdown)
+     VALUES(@id,@hanzi,@pinyin,@tone,@gloss,@hsk,@freq,@spokenFreq,@comp)`,
   );
   const insWords = db.transaction((rows: Word[]) => {
     for (const w of rows)
@@ -153,6 +221,7 @@ function writeDb(
         gloss: w.glossEn,
         hsk: w.hskLevel,
         freq: w.frequencyRank,
+        spokenFreq: w.spokenFreqRank,
         comp: JSON.stringify(w.componentBreakdown),
       });
   });
@@ -212,6 +281,11 @@ async function main() {
 
   const { words, posByHanzi } = await buildWords(mmah);
   process.stdout.write(`  words: ${words.length}\n`);
+
+  const subtlex = loadSubtlex(await cachedFetch(SUBTLEX_URL, 'subtlex-ch-wf.json'));
+  applySpokenFreq(words, subtlex);
+  const ranked = words.filter((w) => w.spokenFreqRank !== null).length;
+  process.stdout.write(`  SUBTLEX-CH: ${subtlex.size} words; ranked ${ranked}/${words.length} seed words\n`);
 
   const sentences = generateSentences(
     words,

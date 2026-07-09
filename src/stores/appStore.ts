@@ -10,11 +10,13 @@ import { Store } from '../lib/db/store';
 import {
   advanceStreak,
   dayQualifies,
+  earnedReward,
   levelForXp,
-  rollReward,
+  xpForReview,
+  xpForTone,
   type RewardRoll,
 } from '../lib/gamification';
-import { applyRating, isKnown, newCard, selectDue } from '../lib/srs';
+import { applyRating, isKnown, newCard, retrievabilityOf, selectDue } from '../lib/srs';
 import type { Card, Rating, ToneDrillResult, UserStats, Word } from '../lib/types';
 
 export function today(d: Date = new Date()): string {
@@ -38,6 +40,7 @@ export interface QueueItem {
 
 interface AppState {
   ready: boolean;
+  initError: boolean;
   rev: number;
   onboarded: boolean;
   stats: UserStats;
@@ -52,8 +55,17 @@ interface AppState {
   dueCount(): number;
 
   addWord(wordId: number): boolean;
-  reviewWord(wordId: number, rating: Rating): { scheduledDays: number; reward: RewardRoll };
-  recordTone(r: ToneDrillResult, correct: boolean): { reward: RewardRoll };
+  noteGloss(wordId: number): void;
+  reviewWord(
+    wordId: number,
+    rating: Rating,
+    combo?: number,
+  ): { scheduledDays: number; reward: RewardRoll; gained: number };
+  recordTone(
+    r: ToneDrillResult,
+    correct: boolean,
+    combo?: number,
+  ): { reward: RewardRoll; gained: number };
   addFeedSeconds(sec: number): void;
   addToneSeconds(sec: number): void;
 }
@@ -65,6 +77,7 @@ function requireStore(s: Store | null): Store {
 
 export const useApp = create<AppState>((set, get) => ({
   ready: false,
+  initError: false,
   rev: 0,
   onboarded: false,
   stats: {
@@ -81,13 +94,19 @@ export const useApp = create<AppState>((set, get) => ({
 
   async init() {
     if (get().ready) return;
-    const store = await Store.open();
-    set({
-      store,
-      ready: true,
-      onboarded: store.isOnboarded(),
-      stats: store.getStats(),
-    });
+    try {
+      const store = await Store.open();
+      set({
+        store,
+        ready: true,
+        onboarded: store.isOnboarded(),
+        stats: store.getStats(),
+      });
+    } catch (e) {
+      // Seed/persistence load failed — surface an error instead of an infinite spinner.
+      console.error('xuexi init failed:', e);
+      set({ initError: true });
+    }
   },
 
   bump() {
@@ -116,26 +135,39 @@ export const useApp = create<AppState>((set, get) => ({
     return new Set(store.allCards().filter(isKnown).map((c) => c.wordId));
   },
 
-  reviewQueue(limit = 20) {
+  // A session = a capped batch of NEW words to learn (taught first) followed by
+  // the due reviews. Capping new items (research P1-2 load protection) keeps the
+  // intro gradual; new words arrive in SPOKEN-frequency order (P0-1) so learners
+  // meet the words that dominate real speech first — basics first, then progress.
+  reviewQueue(limit = 20, maxNew = 8) {
     const store = requireStore(get().store);
     const cards = store.allCards();
-    const due = selectDue(cards);
-    const items: QueueItem[] = [];
-    for (const c of due) {
+    const carded = new Set(cards.map((c) => c.wordId));
+
+    // Due recalls: cards that have actually been studied at least once.
+    const reviews: QueueItem[] = [];
+    for (const c of selectDue(cards)) {
+      if (c.reps === 0) continue; // never-studied added cards are "new", handled below
       const w = store.getWord(c.wordId);
-      if (w) items.push({ word: w, card: c, isNew: c.reps === 0 });
-      if (items.length >= limit) return items;
+      if (w) reviews.push({ word: w, card: c, isNew: false });
     }
-    // Not enough due — introduce new words (never opens to an empty session).
-    if (items.length < limit) {
-      const carded = new Set(cards.map((c) => c.wordId));
-      for (const w of store.words) {
-        if (carded.has(w.id)) continue;
-        items.push({ word: w, card: newCard(w.id), isNew: true });
-        if (items.length >= limit) break;
-      }
+
+    // New words to learn: words tapped/added but never studied, then fresh words
+    // in spoken-frequency order — capped so a session never floods with new.
+    const newItems: QueueItem[] = [];
+    for (const c of selectDue(cards)) {
+      if (c.reps !== 0) continue;
+      const w = store.getWord(c.wordId);
+      if (w) newItems.push({ word: w, card: c, isNew: true });
     }
-    return items;
+    const fresh = store.words.filter((w) => !carded.has(w.id)).sort(bySpokenFreq);
+    for (const w of fresh) {
+      if (newItems.length >= maxNew) break;
+      newItems.push({ word: w, card: newCard(w.id), isNew: true });
+    }
+
+    // Learn new first (leads with teaching), then reviews; capped at `limit`.
+    return [...newItems.slice(0, maxNew), ...reviews].slice(0, limit);
   },
 
   dueCount() {
@@ -151,38 +183,57 @@ export const useApp = create<AppState>((set, get) => ({
     return true;
   },
 
-  reviewWord(wordId, rating) {
+  // Feed→FSRS pipeline (research P0-5): a word glossed twice auto-promotes into
+  // spaced review, so opportunistic look-ups become durable learning without an
+  // extra tap and without flooding the queue on a single curious glance.
+  noteGloss(wordId) {
+    const store = requireStore(get().store);
+    const n = store.bumpGloss(wordId);
+    if (n >= 2 && !store.getCard(wordId)) {
+      store.upsertCard(newCard(wordId));
+      get().bump();
+    }
+  },
+
+  reviewWord(wordId, rating, combo = 0) {
     const store = requireStore(get().store);
     const existing = store.getCard(wordId) ?? newCard(wordId);
+    // Weight XP by the demand actually faced: the card's difficulty and how
+    // shaky recall was *before* this review (research U1 / guardrail #3).
+    const retrievability = retrievabilityOf(existing);
     const { card, scheduledDays } = applyRating(existing, rating);
     store.upsertCard(card);
 
     const day = today();
     const session = store.getSession(day);
-    const base = rating === 'again' ? 2 : 10;
-    const reward = rating === 'again' ? { multiplier: 1, golden: false } : rollReward();
+    const base = xpForReview(rating, { difficulty: existing.difficulty, retrievability });
+    const reward = rating === 'again' ? { multiplier: 1, golden: false } : earnedReward({ combo });
     const gained = Math.round(base * reward.multiplier);
     store.patchSession(day, {
       reviewsDone: session.reviewsDone + 1,
       xpEarned: session.xpEarned + gained,
+      comboMax: Math.max(session.comboMax, combo),
     });
     applyXpAndStreak(store, get, set, gained, day);
     get().bump();
-    return { scheduledDays, reward };
+    return { scheduledDays, reward, gained };
   },
 
-  recordTone(r, correct) {
+  recordTone(r, correct, combo = 0) {
     const store = requireStore(get().store);
     store.addToneResult(r);
     const day = today();
     const session = store.getSession(day);
-    const base = correct ? 5 : 0;
-    const reward = correct ? rollReward() : { multiplier: 1, golden: false };
+    const base = xpForTone(correct);
+    const reward = correct ? earnedReward({ combo }) : { multiplier: 1, golden: false };
     const gained = Math.round(base * reward.multiplier);
-    store.patchSession(day, { xpEarned: session.xpEarned + gained });
+    store.patchSession(day, {
+      xpEarned: session.xpEarned + gained,
+      comboMax: Math.max(session.comboMax, combo),
+    });
     if (gained > 0) applyXpAndStreak(store, get, set, gained, day);
     get().bump();
-    return { reward };
+    return { reward, gained };
   },
 
   addFeedSeconds(sec) {
@@ -218,6 +269,11 @@ export const useApp = create<AppState>((set, get) => ({
 
 function countKnown(store: Store): number {
   return store.allCards().filter(isKnown).length;
+}
+
+/** Order words by SUBTLEX-CH spoken-frequency rank; unranked words sort last. */
+export function bySpokenFreq(a: Word, b: Word): number {
+  return (a.spokenFreqRank ?? Infinity) - (b.spokenFreqRank ?? Infinity);
 }
 
 function maybeStreak(store: Store, stats: UserStats, day: string): UserStats {
