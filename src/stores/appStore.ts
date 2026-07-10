@@ -64,7 +64,7 @@ interface AppState {
   setReminderPrefs(prefs: ReminderPrefs): void;
 
   knownWordIds(): Set<number>;
-  reviewQueue(limit?: number): QueueItem[];
+  reviewQueue(limit?: number, maxNew?: number): QueueItem[];
   dueCount(): number;
 
   addWord(wordId: number): boolean;

@@ -57,9 +57,11 @@ function sameOrder(a: BuildToken[], b: BuildToken[]): boolean {
  * Scramble a sentence's word tokens into a bank order for the puzzle.
  *
  * Deterministic given `seed` (derive it from the token ids via `seedFromIds`).
- * For length > 1 the result is guaranteed NOT to equal the correct order: if a
- * Fisher–Yates pass lands back on the identity we rotate by one, which for any
- * length > 1 always breaks the ordering.
+ * When tokens have distinct ids the result is guaranteed NOT to equal the correct
+ * order: if a Fisher–Yates pass lands back on the identity we rotate by one. (If
+ * every token shares one id — e.g. a word repeated — no ordering is meaningfully
+ * "different"; such a bank grades correct for any arrangement anyway, so it needs
+ * no distinct scramble.)
  */
 export function scrambleTokens(tokens: BuildToken[], seed: number): BuildToken[] {
   if (tokens.length <= 1) return tokens.slice();

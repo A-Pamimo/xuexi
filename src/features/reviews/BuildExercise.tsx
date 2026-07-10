@@ -27,6 +27,9 @@ import {
   type BuildToken,
 } from './buildExercise.logic';
 
+/** A bank chip with a per-instance id, so repeated words stay independently placeable. */
+type Placeable = BuildToken & { uid: number };
+
 export function BuildExercise({
   sentence,
   onDone,
@@ -48,36 +51,41 @@ export function BuildExercise({
   }, [sentence, store]);
 
   // Deterministic per-sentence scramble (stable across re-renders, no RNG here).
-  const bank0 = useMemo<BuildToken[]>(
-    () => scrambleTokens(correct, seedFromIds(correct.map((t) => t.id))),
+  // Each chip gets a unique instance id (`uid`) so identity is per-chip, not per
+  // word — a sentence with a repeated word (谢谢, a second 我/你) stays solvable
+  // instead of both chips vanishing on one tap. Grading still uses the wordId.
+  const bank0 = useMemo<Placeable[]>(
+    () =>
+      scrambleTokens(correct, seedFromIds(correct.map((t) => t.id))).map((t, i) => ({
+        ...t,
+        uid: i,
+      })),
     [correct],
   );
 
-  const [bank, setBank] = useState<BuildToken[]>(bank0);
-  const [picked, setPicked] = useState<BuildToken[]>([]);
+  // Single source of truth: the ordered picks. The bank is whatever hasn't been
+  // placed — so a chip can never be placed twice (double-tap is a no-op).
+  const [picked, setPicked] = useState<Placeable[]>([]);
   const [result, setResult] = useState<'idle' | 'right' | 'wrong'>('idle');
+
+  const placedUids = useMemo(() => new Set(picked.map((p) => p.uid)), [picked]);
+  const bank = useMemo(() => bank0.filter((t) => !placedUids.has(t.uid)), [bank0, placedUids]);
 
   // Silence any sentence playback when leaving the screen (mirrors ReviewScreen).
   useEffect(() => () => void stopAudio(), []);
 
   const graded = result !== 'idle';
 
-  const place = (t: BuildToken) => {
-    if (graded) return;
+  const place = (t: Placeable) => {
+    if (graded || placedUids.has(t.uid)) return;
     juice.tap();
-    setBank((b) => b.filter((x) => x.id !== t.id));
     setPicked((p) => [...p, t]);
   };
 
   const removeAt = (i: number) => {
     if (graded) return;
     juice.tap();
-    setPicked((p) => {
-      const next = p.slice();
-      const [t] = next.splice(i, 1);
-      if (t) setBank((b) => [...b, t]);
-      return next;
-    });
+    setPicked((p) => p.filter((_, idx) => idx !== i));
   };
 
   const check = () => {
@@ -95,7 +103,9 @@ export function BuildExercise({
     else setTimeout(() => onDone(ok), 1100);
   };
 
-  const ready = picked.length === correct.length && !graded;
+  // correct.length > 0 guards the degenerate case where a sentence's words don't
+  // resolve (empty puzzle) — never let an empty answer auto-grade as correct.
+  const ready = correct.length > 0 && picked.length === correct.length && !graded;
 
   return (
     <Screen ambient>
@@ -118,7 +128,7 @@ export function BuildExercise({
           <View style={styles.chipRow}>
             {picked.map((t, i) => (
               <Chip
-                key={t.id}
+                key={t.uid}
                 token={t}
                 onPress={() => removeAt(i)}
                 placed
@@ -134,8 +144,8 @@ export function BuildExercise({
         <View style={{ marginTop: spacing(1.5) }}>
           <Caption style={{ color: colors.bad }}>Correct order</Caption>
           <View style={[styles.chipRow, { marginTop: spacing(1) }]}>
-            {correct.map((t) => (
-              <Chip key={`c${t.id}`} token={t} correct disabled />
+            {correct.map((t, i) => (
+              <Chip key={`c${i}`} token={t} correct disabled />
             ))}
           </View>
         </View>
@@ -146,7 +156,7 @@ export function BuildExercise({
       {/* Word bank. */}
       <View style={[styles.chipRow, styles.bank]}>
         {bank.map((t) => (
-          <Chip key={t.id} token={t} onPress={() => place(t)} disabled={graded} />
+          <Chip key={t.uid} token={t} onPress={() => place(t)} disabled={graded} />
         ))}
         {bank.length === 0 && !graded ? (
           <Caption>all placed — check your answer</Caption>

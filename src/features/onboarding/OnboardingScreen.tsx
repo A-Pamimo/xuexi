@@ -9,7 +9,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { Body, Button, Caption, Display, H1, PlayButton, Screen } from '../../components/ui';
 import { Hanzi, Pinyin } from '../../components/chinese';
 import { ScrambleText } from '../../components/ScrambleText';
-import { playAsset } from '../../lib/audio';
+import { playAsset, unlockAudio } from '../../lib/audio';
 import { track } from '../../lib/analytics';
 import * as juice from '../../lib/juice';
 import { useReducedMotion } from '../../lib/motion';
@@ -51,6 +51,7 @@ export function OnboardingScreen() {
   }, [step]);
 
   const playMa = (tone: number): Promise<boolean> => {
+    unlockAudio(); // this tap is the gesture web needs — propagate the global flag
     juice.tap();
     const ref = store.audioRefsFor('syllable', `ma${tone}`)[0];
     return ref ? playAsset(ref.assetKey) : Promise.resolve(false);
@@ -141,6 +142,7 @@ function FirstWord({ onDone }: { onDone: () => void }) {
 
   const choose = (choice: string) => {
     if (correct) return; // locked once won — this step can't fail, only succeed
+    unlockAudio(); // first real gesture — unlock audio so the feed autoplays later
     setPicked(choice);
     // A mis-tap (the answer is unmissable, but fat-fingers happen) stays open for
     // a retry rather than trapping the learner; only the right answer celebrates.
@@ -156,7 +158,10 @@ function FirstWord({ onDone }: { onDone: () => void }) {
         <Pinyin numbered={FIRST_WORD.pinyin} size={24} />
         <PlayButton
           size={30}
-          play={() => (word ? playWord(store, word.id) : Promise.resolve(false))}
+          play={() => {
+            unlockAudio();
+            return word ? playWord(store, word.id) : Promise.resolve(false);
+          }}
           accessibilityLabel={`Play ${FIRST_WORD.hanzi}, ${FIRST_WORD.pinyin}`}
         />
       </View>
@@ -263,7 +268,10 @@ function FirstSentence({ onDone }: { onDone: () => void }) {
           </Caption>
           <PlayButton
             size={30}
-            play={() => playSentence(store, sentence)}
+            play={() => {
+              unlockAudio();
+              return playSentence(store, sentence);
+            }}
             accessibilityLabel={`Play ${sentence.hanzi}`}
           />
         </View>

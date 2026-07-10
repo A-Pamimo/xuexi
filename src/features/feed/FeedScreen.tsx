@@ -89,7 +89,15 @@ export function FeedScreen() {
         .filter((c) => new Date(c.due).getTime() <= Date.now())
         .map((c) => c.wordId),
     );
-    return selectFeed({ sentences: store.sentences, knownWordIds: known, dueWordIds: due, count: 40 });
+    // Pass the full word list so the feed tops up with generated i+1 sentences
+    // when the curated pool thins — the "never run dry" guarantee (generate.ts).
+    return selectFeed({
+      sentences: store.sentences,
+      knownWordIds: known,
+      dueWordIds: due,
+      count: 40,
+      words: store.words,
+    });
   }, [store, knownWordIds]);
 
   // Accumulate feed time while this screen is mounted.
