@@ -1,5 +1,6 @@
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { Platform } from 'react-native';
 import React, { useEffect } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -7,15 +8,27 @@ import { Body, Loading, Screen } from '../src/components/ui';
 import { BootScreen } from '../src/components/BootScreen';
 import { useApp } from '../src/stores/appStore';
 import { useWebFocusRing } from '../src/lib/motion';
-import { colors } from '../src/theme';
+import { useTheme } from '../src/lib/appearance';
 
 export default function RootLayout() {
   const ready = useApp((s) => s.ready);
   const initError = useApp((s) => s.initError);
   const init = useApp((s) => s.init);
   const [booting, setBooting] = React.useState(true);
+  const { colors, scheme } = useTheme();
 
   useWebFocusRing(); // web-only keyboard :focus-visible ring (no-op on native)
+
+  // Web: keep the global chrome (focus ring + document background) in sync with
+  // the theme so the ring recolors and there's no wrong-mode background flash
+  // behind the app root. No-op on native.
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof document === 'undefined') return;
+    const root = document.documentElement;
+    root.style.setProperty('--xuexi-focus', colors.primary);
+    root.style.backgroundColor = colors.bg;
+    if (document.body) document.body.style.backgroundColor = colors.bg;
+  }, [colors.primary, colors.bg]);
 
   useEffect(() => {
     void init();
@@ -28,7 +41,7 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: colors.bg }}>
       <SafeAreaProvider>
-        <StatusBar style="light" />
+        <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
         {ready ? (
           <Stack
             screenOptions={{

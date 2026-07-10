@@ -11,14 +11,16 @@
  */
 import React, { useEffect, useRef } from 'react';
 import { Animated, Easing, Platform, StyleSheet, Text, View } from 'react-native';
-import { colors, font, spacing, type } from '../theme';
+import { font, spacing, type } from '../theme';
 import { BOOT_MS, EXIT_MS, useReducedMotion } from '../lib/motion';
+import { useTheme } from '../lib/appearance';
 
 const NATIVE_DRIVER = Platform.OS !== 'web';
 const now = () => (globalThis.performance?.now?.() ?? Date.now());
 
 export function BootScreen({ settled, onFinish }: { settled: boolean; onFinish: () => void }) {
   const reduced = useReducedMotion();
+  const { colors } = useTheme();
   const opacity = useRef(new Animated.Value(1)).current;
   const scale = useRef(new Animated.Value(1)).current;
   const start = useRef(now()).current;
@@ -48,17 +50,17 @@ export function BootScreen({ settled, onFinish }: { settled: boolean; onFinish: 
   return (
     <Animated.View
       pointerEvents="none"
-      style={[styles.fill, { opacity, transform: [{ scale }] }]}
+      style={[styles.fill, { backgroundColor: colors.bg, opacity, transform: [{ scale }] }]}
     >
       <View style={styles.stack}>
         {['学', '习'].map((c) => (
-          <Text key={c} style={styles.glyph}>
+          <Text key={c} style={[styles.glyph, { color: colors.text }]}>
             {c}
           </Text>
         ))}
       </View>
-      <Text style={styles.ready}>READY</Text>
-      <Text style={styles.startText}>START!</Text>
+      <Text style={[styles.ready, { color: colors.gold }]}>READY</Text>
+      <Text style={[styles.startText, { color: colors.accent }]}>START!</Text>
     </Animated.View>
   );
 }
@@ -66,7 +68,6 @@ export function BootScreen({ settled, onFinish }: { settled: boolean; onFinish: 
 const styles = StyleSheet.create({
   fill: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: colors.bg,
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 10,
@@ -76,8 +77,7 @@ const styles = StyleSheet.create({
     fontSize: font.hanziXL,
     lineHeight: Math.round(font.hanziXL * 0.98),
     fontWeight: '900',
-    color: colors.text,
   },
-  ready: { ...type.display, color: colors.gold, letterSpacing: 2, marginTop: spacing(3) },
-  startText: { ...type.h1, color: colors.accent, letterSpacing: 4, marginTop: spacing(1) },
+  ready: { ...type.display, letterSpacing: 2, marginTop: spacing(3) },
+  startText: { ...type.h1, letterSpacing: 4, marginTop: spacing(1) },
 });

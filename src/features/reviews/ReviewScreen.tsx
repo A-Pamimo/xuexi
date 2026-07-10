@@ -15,7 +15,8 @@ import { stopAudio } from '../../lib/audio';
 import * as juice from '../../lib/juice';
 import type { Rating, Word } from '../../lib/types';
 import { useApp } from '../../stores/appStore';
-import { colors, font, radius, readableOn, spacing } from '../../theme';
+import { font, radius, spacing } from '../../theme';
+import { useTheme } from '../../lib/appearance';
 import { playWord } from '../shared/play';
 
 const RATINGS: { rating: Rating; label: string; variant: 'bad' | 'ghost' | 'good' }[] = [
@@ -31,6 +32,7 @@ export function ReviewScreen() {
   const reviewWord = useApp((s) => s.reviewWord);
   const reviewQueue = useApp((s) => s.reviewQueue);
   const knownWordIds = useApp((s) => s.knownWordIds);
+  const { colors } = useTheme();
 
   const queue = useMemo(() => reviewQueue(20), [reviewQueue]);
   const [idx, setIdx] = useState(0);
@@ -71,7 +73,7 @@ export function ReviewScreen() {
   if (!item) {
     const known = knownWordIds().size;
     return (
-      <Screen center>
+      <Screen center ambient>
         <Body style={{ fontSize: 48 }}>🎉</Body>
         <H1>Session complete</H1>
         <Body dim style={{ marginTop: spacing(1), textAlign: 'center' }}>
@@ -122,7 +124,7 @@ export function ReviewScreen() {
   };
 
   return (
-    <Screen>
+    <Screen ambient>
       <View style={styles.header}>
         <Caption>
           {isNew ? '✨ Learn' : '🔁 Review'} · {idx + 1}/{queue.length}
@@ -227,8 +229,9 @@ export function ReviewScreen() {
 
 /** Tap-to-reveal per-character breakdown — radical + mnemonic hint (research P1-5). */
 function Breakdown({ word }: { word: Word }) {
+  const { colors } = useTheme();
   return (
-    <View style={styles.breakdown}>
+    <View style={[styles.breakdown, { borderTopColor: colors.border }]}>
       {word.componentBreakdown.map((c, i) => (
         <View key={i} style={styles.breakRow}>
           <Hanzi text={c.char} size={30} />
@@ -243,6 +246,7 @@ function Breakdown({ word }: { word: Word }) {
 }
 
 function ComboMeter({ combo }: { combo: number }) {
+  const { colors, readableOn } = useTheme();
   if (combo < 2) return <Caption>no combo yet</Caption>;
   const milestone = combo >= 10;
   const bg = milestone ? colors.accent : colors.primaryDim;
@@ -272,7 +276,6 @@ const styles = StyleSheet.create({
     alignSelf: 'stretch',
     gap: spacing(1),
     borderTopWidth: 1,
-    borderTopColor: colors.border,
     paddingTop: spacing(2),
   },
   breakRow: { flexDirection: 'row', alignItems: 'center' },

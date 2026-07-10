@@ -16,6 +16,7 @@ import type {
   Card,
   Sentence,
   SessionLog,
+  ThemeMode,
   ToneDrillResult,
   UserStats,
   Word,
@@ -37,6 +38,8 @@ interface ProgressBlob {
   stats: UserStats;
   /** Times each word has been glossed in the Feed (drives auto-promotion to FSRS). */
   glossCounts: Record<number, number>;
+  /** UI theme preference. Defaults to 'system' (follow the OS). */
+  themeMode: ThemeMode;
 }
 
 const DEFAULT_STATS: UserStats = {
@@ -58,6 +61,7 @@ function emptyProgress(): ProgressBlob {
     sessions: {},
     stats: { ...DEFAULT_STATS },
     glossCounts: {},
+    themeMode: 'system',
   };
 }
 
@@ -97,6 +101,15 @@ export class Store {
   }
   setOnboarded(v: boolean): void {
     this.progress.onboarded = v;
+    this.scheduleSave();
+  }
+
+  // --- theme preference ------------------------------------------------------
+  getThemeMode(): ThemeMode {
+    return this.progress.themeMode;
+  }
+  setThemeMode(mode: ThemeMode): void {
+    this.progress.themeMode = mode;
     this.scheduleSave();
   }
 

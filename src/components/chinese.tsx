@@ -3,7 +3,7 @@ import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { syllableToMarks, toneNumbersOf } from '../lib/pinyin';
 import { useScramble } from './ScrambleText';
-import { colors, toneColor } from '../theme';
+import { useTheme } from '../lib/appearance';
 
 export function Hanzi({
   text,
@@ -15,6 +15,7 @@ export function Hanzi({
   /** Opt-in: scramble-resolve the glyphs on mount (default off). */
   reveal?: boolean;
 }) {
+  const { colors } = useTheme();
   const disp = useScramble(text, { kind: 'hanzi', enabled: !!reveal });
   return <Text style={{ color: colors.text, fontSize: size, fontWeight: '700' }}>{disp}</Text>;
 }
@@ -58,6 +59,7 @@ export function Pinyin({
   /** Opt-in: scramble-resolve each syllable on mount (default off). */
   reveal?: boolean;
 }) {
+  const { colors, toneColor } = useTheme();
   const syllables = numbered.split(/\s+/).filter(Boolean);
   const tones = toneNumbersOf(numbered);
   return (

@@ -16,7 +16,9 @@ import { syllableToMarks } from '../../lib/pinyin';
 import type { AudioRef, ToneNumber } from '../../lib/types';
 import { accuracyByTone, speakerTierFor } from '../../lib/toneAdaptive';
 import { useApp } from '../../stores/appStore';
-import { colors, radius, spacing, toneColor, TONE_NAMES } from '../../theme';
+import { radius, spacing, TONE_NAMES } from '../../theme';
+import type { ThemeColors } from '../../theme';
+import { useTheme, useThemedStyles } from '../../lib/appearance';
 import { ToneContour } from './ToneContour';
 
 const SESSION_MS = 60_000;
@@ -33,6 +35,8 @@ export function ToneDojoScreen() {
   const store = useApp((s) => s.store)!;
   const recordTone = useApp((s) => s.recordTone);
   const addToneSeconds = useApp((s) => s.addToneSeconds);
+  const { colors, toneColor } = useTheme();
+  const styles = useThemedStyles(makeStyles);
 
   const allSyllableRefs = useRef<AudioRef[]>(
     store.audioRefs.filter((r) => r.ownerType === 'syllable' && r.tone != null),
@@ -159,7 +163,7 @@ export function ToneDojoScreen() {
 
   if (phase === 'idle') {
     return (
-      <Screen center>
+      <Screen center ambient>
         <Display>🥋</Display>
         <H1>Tone Dojo</H1>
         <Body dim style={{ textAlign: 'center', marginVertical: spacing(2), maxWidth: 320 }}>
@@ -175,7 +179,7 @@ export function ToneDojoScreen() {
     const acc = score.total ? Math.round((score.correct / score.total) * 100) : 0;
     const allTime = allTimeAccuracy(store);
     return (
-      <Screen center>
+      <Screen center ambient>
         <Display>{acc >= 80 ? '🎉' : '💪'}</Display>
         <H1>Time!</H1>
         <Body style={{ marginTop: spacing(1), textAlign: 'center' }}>
@@ -189,7 +193,7 @@ export function ToneDojoScreen() {
   }
 
   return (
-    <Screen>
+    <Screen ambient>
       <View style={styles.top}>
         <Body dim>⏱ {Math.ceil(sessionLeft / 1000)}s</Body>
         <Body style={{ fontWeight: '800', color: combo >= 10 ? colors.accent : colors.text }}>
@@ -279,6 +283,8 @@ function allTimeAccuracy(store: ReturnType<typeof useApp.getState>['store']): nu
 /** Per-tone accuracy with trend — competence feedback (research U2). */
 function ToneBreakdown() {
   const store = useApp((s) => s.store)!;
+  const { toneColor } = useTheme();
+  const styles = useThemedStyles(makeStyles);
   const rows = accuracyByTone(store.toneResults());
   if (!rows.some((r) => r.pct !== null)) return null;
   return (
@@ -300,26 +306,20 @@ function ToneBreakdown() {
   );
 }
 
-const styles = StyleSheet.create({
-  top: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: spacing(1) },
-  timerTrack: {
-    height: 8,
-    backgroundColor: colors.surfaceAlt,
-    borderRadius: radius.pill,
-    overflow: 'hidden',
-  },
-  timerFill: { height: 8, backgroundColor: colors.primary },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  breakdown: { marginTop: spacing(2), alignSelf: 'stretch', gap: spacing(0.75) },
-  breakdownRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  tones: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
-  toneBtn: {
-    width: '48%',
-    borderWidth: 2,
-    borderRadius: radius.md,
-    alignItems: 'center',
-    paddingVertical: spacing(1.5),
-    marginBottom: spacing(1.5),
-    backgroundColor: colors.surface,
-  },
-});
+const makeStyles = (c: ThemeColors) =>
+  StyleSheet.create({
+    top: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: spacing(1) },
+    center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+    breakdown: { marginTop: spacing(2), alignSelf: 'stretch', gap: spacing(0.75) },
+    breakdownRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    tones: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
+    toneBtn: {
+      width: '48%',
+      borderWidth: 2,
+      borderRadius: radius.md,
+      alignItems: 'center',
+      paddingVertical: spacing(1.5),
+      marginBottom: spacing(1.5),
+      backgroundColor: c.surface,
+    },
+  });

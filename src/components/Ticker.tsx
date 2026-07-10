@@ -18,9 +18,10 @@ import Animated, {
   withRepeat,
   withTiming,
 } from 'react-native-reanimated';
-import { colors, spacing, toneColor } from '../theme';
+import { spacing } from '../theme';
 import type { ToneNumber } from '../lib/types';
 import { TICKER_PXPS, useReducedMotion } from '../lib/motion';
+import { useTheme } from '../lib/appearance';
 
 export function Ticker({
   text,
@@ -40,6 +41,7 @@ export function Ticker({
   style?: StyleProp<ViewStyle>;
 }) {
   const reduced = useReducedMotion();
+  const { colors, toneColor } = useTheme();
   const [trackW, setTrackW] = useState(0);
   const x = useSharedValue(0);
   const animStyle = useAnimatedStyle(() => ({ transform: [{ translateX: x.value }] }));

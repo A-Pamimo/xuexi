@@ -8,17 +8,21 @@ import { ScrollView, StyleSheet, View } from 'react-native';
 import Svg, { Rect } from 'react-native-svg';
 import { Body, Caption, Card, Display, H1, H2, ProgressBar, Screen } from '../../components/ui';
 import { Hanzi, Pinyin } from '../../components/chinese';
+import { ThemeToggle } from '../../components/ThemeToggle';
 import { levelProgress, rollingHitRate } from '../../lib/gamification';
 import { useReducedMotion } from '../../lib/motion';
 import { isKnown } from '../../lib/srs';
 import { State } from 'ts-fsrs';
 import { useApp, today } from '../../stores/appStore';
-import { colors, radius, spacing, font } from '../../theme';
+import { radius, spacing, font } from '../../theme';
+import type { ThemeColors } from '../../theme';
+import { useTheme } from '../../lib/appearance';
 
 export function StatsScreen() {
   const store = useApp((s) => s.store)!;
   const stats = useApp((s) => s.stats);
   useApp((s) => s.rev); // re-render on mutations
+  const { colors } = useTheme();
 
   const cards = store.allCards();
   const learned = cards
@@ -29,7 +33,7 @@ export function StatsScreen() {
   const prog = levelProgress(stats.xp);
 
   return (
-    <Screen>
+    <Screen ambient>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: spacing(4) }}>
         <H1>Your progress</H1>
 
@@ -52,11 +56,14 @@ export function StatsScreen() {
               {prog.into}/{prog.span} XP
             </Body>
           </View>
-          <View style={styles.xpTrack}>
+          <View style={[styles.xpTrack, { backgroundColor: colors.surfaceAlt }]}>
             <View
               style={[
                 styles.xpFill,
-                { width: `${Math.min(100, (prog.into / Math.max(1, prog.span)) * 100)}%` },
+                {
+                  backgroundColor: colors.primary,
+                  width: `${Math.min(100, (prog.into / Math.max(1, prog.span)) * 100)}%`,
+                },
               ]}
             />
           </View>
@@ -73,7 +80,10 @@ export function StatsScreen() {
                   key={word.id}
                   style={[
                     styles.cell,
-                    { borderColor: masteryColor(card.state, card.stability) },
+                    {
+                      backgroundColor: colors.surfaceAlt,
+                      borderColor: masteryColor(colors, card.state, card.stability),
+                    },
                   ]}
                 >
                   <Hanzi text={word.hanzi[0]!} size={22} />
@@ -87,6 +97,9 @@ export function StatsScreen() {
         <Card>
           <WeeklyRecap />
         </Card>
+
+        <View style={styles.section}><H2>Appearance</H2></View>
+        <ThemeToggle />
       </ScrollView>
     </Screen>
   );
@@ -95,6 +108,7 @@ export function StatsScreen() {
 function Odometer({ hours }: { hours: number }) {
   const target = Math.round(hours * 60); // minutes
   const reduce = useReducedMotion();
+  const { colors } = useTheme();
   // Reduced motion: skip the count-up, show the final value (no first-frame flash of 0).
   const [shown, setShown] = useState(() => (reduce ? target : 0));
   useEffect(() => {
@@ -119,7 +133,7 @@ function Odometer({ hours }: { hours: number }) {
   return (
     <Card style={styles.odometer}>
       <Caption>total input time</Caption>
-      <Body style={styles.odoNumber}>
+      <Body style={[styles.odoNumber, { color: colors.primary }]}>
         {h}h {m}m
       </Body>
       <Caption style={{ textAlign: 'center' }}>input hours are the real progress metric</Caption>
@@ -148,10 +162,11 @@ function useFeaturedWord() {
 
 function FeaturedWord() {
   const featured = useFeaturedWord();
+  const { colors } = useTheme();
   if (!featured) return null; // pre-onboarding / empty grid: render nothing
   const { card, word } = featured;
   return (
-    <Card style={{ ...styles.featured, borderColor: masteryColor(card.state, card.stability) }}>
+    <Card style={{ ...styles.featured, borderColor: masteryColor(colors, card.state, card.stability) }}>
       <Caption>currently learning</Caption>
       <Hanzi text={word.hanzi} size={font.hanziL} />
       <Pinyin numbered={word.pinyinNumbered} size={20} />
@@ -162,6 +177,7 @@ function FeaturedWord() {
 
 function WeeklyRecap() {
   const store = useApp((s) => s.store)!;
+  const { colors } = useTheme();
   const days: { date: string; reviews: number; minutes: number }[] = [];
   const base = new Date(today());
   for (let i = 6; i >= 0; i--) {
@@ -207,6 +223,7 @@ function WeeklyRecap() {
 /** Forgiving rolling consistency (research P0-4 / U6) — a missed day is not total loss. */
 function HitRate() {
   const store = useApp((s) => s.store)!;
+  const { colors } = useTheme();
   const hr = rollingHitRate(store.allSessions(), today());
   if (hr.window === 0) return null;
   const pct = Math.round(hr.rate * 100);
@@ -236,7 +253,7 @@ function Stat({ big, label }: { big: string; label: string }) {
   );
 }
 
-function masteryColor(state: number, stability: number): string {
+function masteryColor(colors: ThemeColors, state: number, stability: number): string {
   if (state === State.New) return colors.border;
   if (stability < 3) return colors.tone4;
   if (stability < 15) return colors.tone3;
@@ -251,14 +268,14 @@ const styles = StyleSheet.create({
     paddingVertical: spacing(5),
     gap: spacing(1),
   },
-  odoNumber: { fontSize: 64, fontWeight: '900', color: colors.primary, marginVertical: spacing(0.5) },
+  odoNumber: { fontSize: 64, fontWeight: '900', marginVertical: spacing(0.5) },
   featured: { marginTop: spacing(2), alignItems: 'center', gap: spacing(1), paddingVertical: spacing(3) },
   rowStats: { flexDirection: 'row', gap: spacing(1), marginTop: spacing(3) },
   stat: { flex: 1, alignItems: 'center', paddingVertical: spacing(2) },
   section: { marginTop: spacing(4), marginBottom: spacing(1) },
   levelRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: spacing(1) },
-  xpTrack: { height: 12, backgroundColor: colors.surfaceAlt, borderRadius: radius.pill, overflow: 'hidden' },
-  xpFill: { height: 12, backgroundColor: colors.primary },
+  xpTrack: { height: 12, borderRadius: radius.pill, overflow: 'hidden' },
+  xpFill: { height: 12 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing(1) },
   cell: {
     width: 40,
@@ -267,6 +284,5 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.surfaceAlt,
   },
 });
