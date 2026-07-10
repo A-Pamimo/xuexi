@@ -18,20 +18,50 @@ import {
 // off on web, on everywhere else.
 const NATIVE_DRIVER = Platform.OS !== 'web';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { colors, elevation, font, HIT, radius, readableOn, spacing, type } from '../theme';
+import { elevation, font, HIT, radius, spacing, type } from '../theme';
+import type { ThemeColors } from '../theme';
 import { useReducedMotion } from '../lib/motion';
+import { useTheme, type Scheme } from '../lib/appearance';
+import { AmbientBackground } from './AmbientBackground';
+import { AMBIENT_BACKGROUND } from '../lib/flags';
+
+// Color-dependent styles are built per palette and cached by scheme (only two
+// ever exist), so switching themes never rebuilds a StyleSheet and layout props
+// stay in one place. Non-color props live here too; nothing color is hardcoded.
+const styleCache = new Map<Scheme, ReturnType<typeof buildStyles>>();
+function useStyles(): ReturnType<typeof buildStyles> {
+  const { scheme, colors } = useTheme();
+  let s = styleCache.get(scheme);
+  if (!s) {
+    s = buildStyles(colors);
+    styleCache.set(scheme, s);
+  }
+  return s;
+}
 
 export function Screen({
   children,
   style,
   center,
+  ambient = false,
 }: {
   children: React.ReactNode;
   style?: ViewStyle;
   center?: boolean;
+  /** Render the ambient shader backdrop behind content (tab screens opt in;
+   *  onboarding/boot deliberately don't, to keep GL off the cold-load path). */
+  ambient?: boolean;
 }) {
+  const { colors } = useTheme();
+  // Opt-in ambient: an opaque themed base + the shader behind content. Without it
+  // the Screen is a plain themed surface. Content sits on cards (opaque) so text
+  // legibility is unaffected either way.
   return (
-    <SafeAreaView style={styles.screen} edges={['top']}>
+    <SafeAreaView
+      style={[styles.screen, { backgroundColor: ambient ? undefined : colors.bg }]}
+      edges={['top']}
+    >
+      {ambient && AMBIENT_BACKGROUND ? <AmbientBackground /> : null}
       <View
         style={[
           { flex: 1, padding: spacing(2) },
@@ -47,16 +77,18 @@ export function Screen({
 
 // ---- Typography ------------------------------------------------------------
 type TextProps = { children: React.ReactNode; style?: StyleProp<TextStyle>; dim?: boolean };
-const mk = (base: TextStyle) =>
+const mk = (base: TextStyle, defaultDim = false) =>
   function T({ children, style, dim }: TextProps) {
-    return <Text style={[base, dim && { color: colors.textDim }, style]}>{children}</Text>;
+    const { colors } = useTheme();
+    const color = dim || defaultDim ? colors.textDim : colors.text;
+    return <Text style={[base, { color }, style]}>{children}</Text>;
   };
-export const Display = mk({ ...type.display, color: colors.text });
-export const H1 = mk({ ...type.h1, color: colors.text });
-export const H2 = mk({ ...type.h2, color: colors.text });
-export const Body = mk({ ...type.body, color: colors.text });
-export const Label = mk({ ...type.label, color: colors.text });
-export const Caption = mk({ ...type.caption, color: colors.textDim });
+export const Display = mk({ ...type.display });
+export const H1 = mk({ ...type.h1 });
+export const H2 = mk({ ...type.h2 });
+export const Body = mk({ ...type.body });
+export const Label = mk({ ...type.label });
+export const Caption = mk({ ...type.caption }, true);
 
 // ---- Button ----------------------------------------------------------------
 export function Button({
@@ -74,6 +106,7 @@ export function Button({
   style?: ViewStyle;
   accessibilityLabel?: string;
 }) {
+  const { colors, readableOn } = useTheme();
   const fill =
     variant === 'primary'
       ? colors.primary
@@ -94,7 +127,7 @@ export function Button({
       style={({ pressed }) => [
         styles.btn,
         { backgroundColor: fill },
-        variant === 'ghost' && styles.btnGhost,
+        variant === 'ghost' && { borderWidth: 1, borderColor: colors.borderStrong },
         { opacity: disabled ? 0.4 : 1, transform: [{ scale: pressed ? 0.97 : 1 }] },
         style,
       ]}
@@ -114,7 +147,8 @@ export function Card({
   style?: ViewStyle;
   raised?: boolean;
 }) {
-  return <View style={[styles.card, raised && elevation.card, style]}>{children}</View>;
+  const s = useStyles();
+  return <View style={[s.card, raised && elevation.card, style]}>{children}</View>;
 }
 
 export function Pill({
@@ -126,30 +160,32 @@ export function Pill({
   style?: ViewStyle;
   tone?: 'default' | 'active';
 }) {
-  return (
-    <View style={[styles.pill, tone === 'active' && styles.pillActive, style]}>{children}</View>
-  );
+  const s = useStyles();
+  return <View style={[s.pill, tone === 'active' && s.pillActive, style]}>{children}</View>;
 }
 
 export function ProgressBar({
   value,
-  color = colors.primary,
+  color,
   height = 10,
-  track = colors.surfaceAlt,
+  track,
 }: {
   value: number; // 0..1
   color?: string;
   height?: number;
   track?: string;
 }) {
+  const { colors } = useTheme();
+  const fill = color ?? colors.primary;
+  const trackColor = track ?? colors.surfaceAlt;
   const pct = Math.max(0, Math.min(1, value)) * 100;
   return (
     <View
       accessibilityRole="progressbar"
       accessibilityValue={{ now: Math.round(pct), min: 0, max: 100 }}
-      style={[styles.track, { height, backgroundColor: track }]}
+      style={[styles.track, { height, backgroundColor: trackColor }]}
     >
-      <View style={{ height, width: `${pct}%`, backgroundColor: color, borderRadius: radius.pill }} />
+      <View style={{ height, width: `${pct}%`, backgroundColor: fill, borderRadius: radius.pill }} />
     </View>
   );
 }
@@ -174,6 +210,7 @@ export function PlayButton({
   accessibilityLabel?: string;
   style?: ViewStyle;
 }) {
+  const { colors } = useTheme();
   const [state, setState] = useState<'idle' | 'playing' | 'unavailable'>('idle');
   const scale = useRef(new Animated.Value(1)).current;
   const failTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -242,6 +279,7 @@ export function PlayButton({
 }
 
 export function Loading({ label }: { label?: string }) {
+  const { colors } = useTheme();
   return (
     <Screen center>
       <ActivityIndicator color={colors.primary} size="large" />
@@ -250,8 +288,9 @@ export function Loading({ label }: { label?: string }) {
   );
 }
 
+// Layout-only, palette-independent styles.
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.bg },
+  screen: { flex: 1 },
   btn: {
     minHeight: HIT,
     paddingVertical: spacing(1.5),
@@ -260,28 +299,33 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  btnGhost: { borderWidth: 1, borderColor: colors.borderStrong },
   btnLabel: { fontSize: font.body, fontWeight: '800' },
-  card: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing(2),
-  },
-  pill: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.pill,
-    paddingHorizontal: spacing(2),
-    paddingVertical: spacing(1),
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: 'center',
-    minHeight: 36,
-    justifyContent: 'center',
-  },
-  pillActive: { borderColor: colors.primary, backgroundColor: colors.primarySoft },
   track: { borderRadius: radius.pill, overflow: 'hidden', width: '100%' },
   play: { alignItems: 'center', justifyContent: 'center' },
   playCircle: { alignItems: 'center', justifyContent: 'center', borderWidth: 2 },
 });
+
+// Palette-dependent styles, cached per scheme.
+function buildStyles(c: ThemeColors) {
+  return StyleSheet.create({
+    card: {
+      backgroundColor: c.surface,
+      borderRadius: radius.lg,
+      borderWidth: 1,
+      borderColor: c.border,
+      padding: spacing(2),
+    },
+    pill: {
+      backgroundColor: c.surface,
+      borderRadius: radius.pill,
+      paddingHorizontal: spacing(2),
+      paddingVertical: spacing(1),
+      borderWidth: 1,
+      borderColor: c.border,
+      alignItems: 'center',
+      minHeight: 36,
+      justifyContent: 'center',
+    },
+    pillActive: { borderColor: c.primary, backgroundColor: c.primarySoft },
+  });
+}

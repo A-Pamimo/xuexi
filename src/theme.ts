@@ -1,44 +1,101 @@
 /**
- * Design tokens for xuexi's dark, high-contrast "dopamine" aesthetic.
+ * Design tokens for xuexi. The palette is now MODE-AWARE: `darkColors` and
+ * `lightColors` share one `ThemeColors` shape, resolved live per render via
+ * `useTheme()` (src/lib/appearance.ts). Non-color tokens (spacing, radius, type,
+ * elevation) are mode-independent and stay static.
  *
- * Redesign notes (UX pass): palette tuned so every text/fill pairing meets
- * WCAG AA (see contrast table below); a documented type ramp replaces ad-hoc
- * font sizes; flat elevation (layered surfaces + borders + a soft shadow, no
- * glow/gradients) gives hierarchy per the Craft rules.
+ * Aesthetic — "Calm Focus, Living Ink": reading-first, low-chroma neutral
+ * surfaces so hanzi/pinyin carry the color; one calm indigo primary; a warm
+ * amber accent used only at reward moments; the four tone colors are preserved
+ * across both modes as the app's signature (colorblind-aware — they vary in
+ * lightness, not just hue) and are AA-legible in BOTH modes.
  *
- * Verified contrast (AA needs 4.5 body / 3.0 large & UI):
- *   text/bg 18.0 · textDim/bg 7.1 · onPrimary/primary 4.9 · onAccent/accent 8.6
- *   primary/bg 4.0 (large only) · good/bg 10.6 · gold/bg 13.0
+ * Contrast rule: light-mode tone/semantic colors are genuinely DARKENED (not
+ * inverted neutrals) — the dark tone hexes fail AA as ink on white. A Jest test
+ * (theme.contrast.test.ts) asserts AA for the documented pairings in BOTH
+ * palettes, so a light-mode regression fails CI rather than shipping.
  */
-export const colors = {
-  bg: '#0B0B12',
-  bgElevated: '#101019', // raised chrome (tab bar, sheets)
-  surface: '#16161F',
-  surfaceAlt: '#20202C',
-  border: '#2A2A38',
-  borderStrong: '#3A3A4C',
-  text: '#F5F5FA',
-  textDim: '#9A9AB0',
-  primary: '#6E4DF0', // violet (darkened from #7C5CFF for AA text contrast)
-  primaryDim: '#5B44BF',
-  primarySoft: '#211C3A', // tinted fill behind primary content
-  onPrimary: '#FFFFFF',
-  accent: '#FF4D8D', // hot pink — decorative / milestones
-  onAccent: '#1A0410', // dark text for use ON accent/gold fills
-  good: '#2BD98A',
-  bad: '#FF5C5C',
-  gold: '#FFCC33',
-  tone1: '#5AC8FA',
-  tone2: '#34C759',
-  tone3: '#FF9F0A',
-  tone4: '#FF375F',
-} as const;
 
-export const toneColor = (t: number): string =>
-  [colors.tone1, colors.tone2, colors.tone3, colors.tone4][t - 1] ?? colors.textDim;
+/** The full color token set — identical keys across light and dark. */
+export interface ThemeColors {
+  bg: string;
+  bgElevated: string;
+  surface: string;
+  surfaceAlt: string;
+  border: string;
+  borderStrong: string;
+  text: string;
+  textDim: string;
+  primary: string;
+  primaryDim: string;
+  primarySoft: string;
+  onPrimary: string;
+  accent: string;
+  onAccent: string;
+  good: string;
+  bad: string;
+  gold: string;
+  tone1: string;
+  tone2: string;
+  tone3: string;
+  tone4: string;
+}
+
+export const darkColors: ThemeColors = {
+  bg: '#0E1016',
+  bgElevated: '#151824', // raised chrome (tab bar, sheets)
+  surface: '#1A1E2B',
+  surfaceAlt: '#232838',
+  border: '#2C3346',
+  borderStrong: '#3C445C',
+  text: '#F2F4FA',
+  textDim: '#9AA3B8',
+  primary: '#7C8CFF', // calm indigo, brightened for a dark ground
+  primaryDim: '#5B67CC',
+  primarySoft: '#1D2238', // tinted fill behind primary content
+  onPrimary: '#0B0E18', // dark ink on the light-indigo fill
+  accent: '#FFB454', // warm amber — reward / milestones only
+  onAccent: '#241503', // dark ink on amber/gold fills
+  good: '#3DDC97',
+  bad: '#FF6B6B',
+  gold: '#FFD24A',
+  tone1: '#4FB8F5', // high & flat
+  tone2: '#3CC96A', // rising
+  tone3: '#FFA83D', // dip
+  tone4: '#FF5C7A', // falling
+};
+
+export const lightColors: ThemeColors = {
+  bg: '#F6F7FB', // soft off-white, faintly cool — lower glare than pure white
+  bgElevated: '#FFFFFF',
+  surface: '#FFFFFF',
+  surfaceAlt: '#EEF0F6',
+  border: '#DCE0EA',
+  borderStrong: '#C2C8D6',
+  text: '#171A21',
+  textDim: '#5A6072', // deliberately not too pale — AA body on bg
+  primary: '#4B54D6', // deeper indigo so it's AA as ink on light bg
+  primaryDim: '#3A42B0',
+  primarySoft: '#E7E9FB',
+  onPrimary: '#FFFFFF',
+  accent: '#C4740A', // amber darkened for AA as ink on light
+  onAccent: '#241503', // dark ink — white on mid-amber fails AA (3.6:1); dark ink ~4.9:1
+
+  good: '#0E9E62',
+  bad: '#D83A3A',
+  gold: '#B7791F',
+  tone1: '#1C7FD6',
+  tone2: '#1E9E52',
+  tone3: '#C4740A',
+  tone4: '#D8365C',
+};
+
+/** Tone color for a palette (1-based tone number). */
+export const toneColorOf = (c: ThemeColors, t: number): string =>
+  [c.tone1, c.tone2, c.tone3, c.tone4][t - 1] ?? c.textDim;
 
 /** Relative luminance of a #rrggbb color (WCAG). */
-function luminance(hex: string): number {
+export function luminance(hex: string): number {
   const c = (hex.replace('#', '').match(/../g) ?? ['0', '0', '0']).map((h) => {
     const v = parseInt(h, 16) / 255;
     return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
@@ -46,9 +103,18 @@ function luminance(hex: string): number {
   return 0.2126 * (c[0] ?? 0) + 0.7152 * (c[1] ?? 0) + 0.0722 * (c[2] ?? 0);
 }
 
-/** Pick the app's light or dark ink for AA-legible text on an arbitrary fill. */
-export const readableOn = (bg: string): string =>
-  luminance(bg) > 0.32 ? colors.onAccent : colors.onPrimary;
+/** WCAG contrast ratio between two #rrggbb colors (1..21). */
+export function contrastRatio(a: string, b: string): number {
+  const la = luminance(a);
+  const lb = luminance(b);
+  const hi = Math.max(la, lb);
+  const lo = Math.min(la, lb);
+  return (hi + 0.05) / (lo + 0.05);
+}
+
+/** Pick the palette's light or dark ink for AA-legible text on an arbitrary fill. */
+export const readableInk = (c: ThemeColors, bg: string): string =>
+  luminance(bg) > 0.32 ? c.onAccent : c.onPrimary;
 
 /** Human tone names — shared so labels/a11y stay consistent app-wide. */
 export const TONE_NAMES = ['high & flat', 'rising', 'dip', 'falling'] as const;

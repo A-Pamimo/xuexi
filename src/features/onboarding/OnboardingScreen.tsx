@@ -11,7 +11,8 @@ import { Hanzi } from '../../components/chinese';
 import { playAsset } from '../../lib/audio';
 import * as juice from '../../lib/juice';
 import { useApp } from '../../stores/appStore';
-import { colors, radius, spacing, toneColor, TONE_NAMES } from '../../theme';
+import { radius, spacing, TONE_NAMES } from '../../theme';
+import { useTheme } from '../../lib/appearance';
 import { ToneContour } from '../toneDojo/ToneContour';
 
 const TONES = [
@@ -26,6 +27,7 @@ export function OnboardingScreen() {
   const router = useRouter();
   const store = useApp((s) => s.store)!;
   const completeOnboarding = useApp((s) => s.completeOnboarding);
+  const { colors, toneColor } = useTheme();
   const [step, setStep] = useState(0);
 
   const playMa = (tone: number): Promise<boolean> => {
@@ -60,7 +62,10 @@ export function OnboardingScreen() {
           </Body>
           <View style={styles.toneList}>
             {TONES.map((t) => (
-              <View key={t.n} style={styles.toneRow}>
+              <View
+                key={t.n}
+                style={[styles.toneRow, { backgroundColor: colors.surface, borderColor: colors.border }]}
+              >
                 <ToneContour tone={t.n} size={72} />
                 <View style={styles.toneText}>
                   <Body style={{ fontSize: 26, fontWeight: '800', color: toneColor(t.n) }}>
@@ -95,6 +100,7 @@ export function OnboardingScreen() {
 
 /** Step progress — visibility of where you are in onboarding. */
 function Dots({ step }: { step: number }) {
+  const { colors } = useTheme();
   return (
     <View style={styles.dots} accessibilityLabel={`Step ${step + 1} of ${STEPS}`}>
       {Array.from({ length: STEPS }).map((_, i) => (
@@ -120,10 +126,8 @@ const styles = StyleSheet.create({
   toneRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.surface,
     borderRadius: radius.md,
     borderWidth: 1,
-    borderColor: colors.border,
     padding: spacing(1.5),
     gap: spacing(1.5),
   },

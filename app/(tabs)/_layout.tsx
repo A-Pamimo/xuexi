@@ -4,7 +4,7 @@ import { Text } from 'react-native';
 import { useApp } from '../../src/stores/appStore';
 import { unlockAudio } from '../../src/lib/audio';
 import * as juice from '../../src/lib/juice';
-import { colors } from '../../src/theme';
+import { useTheme } from '../../src/lib/appearance';
 
 function Icon({ label, color }: { label: string; color: string }) {
   return <Text style={{ fontSize: 20, color }}>{label}</Text>;
@@ -12,9 +12,13 @@ function Icon({ label, color }: { label: string; color: string }) {
 
 export default function TabsLayout() {
   const onboarded = useApp((s) => s.onboarded);
+  const { colors } = useTheme();
   if (!onboarded) return <Redirect href="/onboarding" />;
 
   return (
+    // Scenes keep an opaque base so inactive tabs never bleed through; each tab
+    // screen renders its own ambient backdrop (behind content, in front of this
+    // base). Cards / the tab bar stay opaque for text legibility.
     <Tabs
       screenListeners={{
         // The tab press is exactly the gesture browsers require to unlock audio,
@@ -26,6 +30,7 @@ export default function TabsLayout() {
       }}
       screenOptions={{
         headerShown: false,
+        sceneStyle: { backgroundColor: colors.bg },
         tabBarStyle: {
           backgroundColor: colors.bgElevated,
           borderTopColor: colors.border,

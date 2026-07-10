@@ -12,7 +12,7 @@
  */
 import { useEffect, useState } from 'react';
 import { AccessibilityInfo, Platform } from 'react-native';
-import { colors, radius } from '../theme';
+import { radius } from '../theme';
 
 /** Tunable motion durations/speeds — the one place to retune app-wide feel. */
 export const BOOT_MS = 700; // min visible time for the arcade boot overlay
@@ -86,8 +86,10 @@ const FOCUS_RING_ID = 'xuexi-focus-ring';
 
 /**
  * Web-only: install a global :focus-visible ring (Rauno's "real focus states")
- * so keyboard users get a visible violet outline while mouse/touch focus stays
- * quiet. No-op on native. Idempotent — safe under StrictMode double-invoke.
+ * so keyboard users get a visible outline while mouse/touch focus stays quiet.
+ * The color reads a CSS custom property (`--xuexi-focus`) that the root layout
+ * updates per theme, so the ring recolors in light vs dark. No-op on native.
+ * Idempotent — safe under StrictMode double-invoke.
  */
 export function useWebFocusRing(): void {
   useEffect(() => {
@@ -96,7 +98,7 @@ export function useWebFocusRing(): void {
     const el = document.createElement('style');
     el.id = FOCUS_RING_ID;
     el.textContent =
-      `:focus-visible{outline:2px solid ${colors.primary};outline-offset:2px;border-radius:${radius.sm}px;}` +
+      `:focus-visible{outline:2px solid var(--xuexi-focus, #7C8CFF);outline-offset:2px;border-radius:${radius.sm}px;}` +
       `:focus:not(:focus-visible){outline:none;}`;
     document.head.appendChild(el);
     return () => {

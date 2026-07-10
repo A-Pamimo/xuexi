@@ -19,7 +19,11 @@ import { isAudioUnlocked, unlockAudio as unlockAudioGlobal } from '../../lib/aud
 import * as juice from '../../lib/juice';
 import type { Sentence, Word } from '../../lib/types';
 import { useApp } from '../../stores/appStore';
-import { colors, elevation, font, radius, spacing } from '../../theme';
+import { elevation, font, luminance, radius, spacing } from '../../theme';
+import type { ThemeColors } from '../../theme';
+import { useTheme, useThemedStyles } from '../../lib/appearance';
+import { AmbientBackground } from '../../components/AmbientBackground';
+import { AMBIENT_BACKGROUND } from '../../lib/flags';
 import { selectFeed } from './selection';
 import { playSentence, playWord } from '../shared/play';
 
@@ -37,6 +41,8 @@ export function FeedScreen() {
   const addWord = useApp((s) => s.addWord);
   const noteGloss = useApp((s) => s.noteGloss);
   const { height } = useWindowDimensions();
+  const { colors } = useTheme();
+  const styles = useThemedStyles(makeStyles);
 
   const [showPinyin, setShowPinyin] = useState(true);
   const [selected, setSelected] = useState<Word | null>(null);
@@ -115,7 +121,8 @@ export function FeedScreen() {
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.bg }}>
+    <View style={styles.root}>
+      {AMBIENT_BACKGROUND ? <AmbientBackground /> : null}
       <FlatList
         data={feed}
         keyExtractor={(s) => String(s.id)}
@@ -219,55 +226,58 @@ export function FeedScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  card: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: spacing(3),
-  },
-  hanziWrap: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center' },
-  tokenWord: {
-    color: colors.text,
-    fontSize: font.hanziM,
-    fontWeight: '700',
-    textDecorationLine: 'underline',
-    textDecorationColor: colors.primary,
-  },
-  tokenPlain: { color: colors.textDim, fontSize: font.hanziM, fontWeight: '700' },
-  overlay: {
-    position: 'absolute',
-    top: spacing(6),
-    right: spacing(2),
-    gap: spacing(1),
-    alignItems: 'flex-end',
-  },
-  streakRibbon: { position: 'absolute', bottom: spacing(1), left: spacing(2), right: spacing(2) },
-  modalBg: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: spacing(3),
-  },
-  modal: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.xl,
-    borderWidth: 1,
-    borderColor: colors.borderStrong,
-    padding: spacing(3),
-    alignItems: 'center',
-    minWidth: 300,
-    ...elevation.modal,
-  },
-  modalActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: spacing(2.5),
-    gap: spacing(1.5),
-    alignSelf: 'stretch',
-  },
-});
+const makeStyles = (c: ThemeColors) =>
+  StyleSheet.create({
+    root: { flex: 1 }, // transparent — ambient backdrop shows through
+    card: {
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: spacing(3),
+    },
+    hanziWrap: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center' },
+    tokenWord: {
+      color: c.text,
+      fontSize: font.hanziM,
+      fontWeight: '700',
+      textDecorationLine: 'underline',
+      textDecorationColor: c.primary,
+    },
+    tokenPlain: { color: c.textDim, fontSize: font.hanziM, fontWeight: '700' },
+    overlay: {
+      position: 'absolute',
+      top: spacing(6),
+      right: spacing(2),
+      gap: spacing(1),
+      alignItems: 'flex-end',
+    },
+    streakRibbon: { position: 'absolute', bottom: spacing(1), left: spacing(2), right: spacing(2) },
+    modalBg: {
+      position: 'absolute',
+      top: 0,
+      bottom: 0,
+      left: 0,
+      right: 0,
+      // Scrim tuned per mode — a heavy black veil reads wrong over a light app.
+      backgroundColor: luminance(c.bg) > 0.5 ? 'rgba(20,22,30,0.35)' : 'rgba(0,0,0,0.7)',
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: spacing(3),
+    },
+    modal: {
+      backgroundColor: c.surface,
+      borderRadius: radius.xl,
+      borderWidth: 1,
+      borderColor: c.borderStrong,
+      padding: spacing(3),
+      alignItems: 'center',
+      minWidth: 300,
+      ...elevation.modal,
+    },
+    modalActions: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginTop: spacing(2.5),
+      gap: spacing(1.5),
+      alignSelf: 'stretch',
+    },
+  });

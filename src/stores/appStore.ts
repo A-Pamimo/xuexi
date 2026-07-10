@@ -17,7 +17,7 @@ import {
   type RewardRoll,
 } from '../lib/gamification';
 import { applyRating, isKnown, newCard, retrievabilityOf, selectDue } from '../lib/srs';
-import type { Card, Rating, ToneDrillResult, UserStats, Word } from '../lib/types';
+import type { Card, Rating, ThemeMode, ToneDrillResult, UserStats, Word } from '../lib/types';
 
 export function today(d: Date = new Date()): string {
   return d.toISOString().slice(0, 10);
@@ -43,12 +43,14 @@ interface AppState {
   initError: boolean;
   rev: number;
   onboarded: boolean;
+  themeMode: ThemeMode;
   stats: UserStats;
   store: Store | null;
 
   init(): Promise<void>;
   bump(): void;
   completeOnboarding(): void;
+  setThemeMode(mode: ThemeMode): void;
 
   knownWordIds(): Set<number>;
   reviewQueue(limit?: number): QueueItem[];
@@ -80,6 +82,7 @@ export const useApp = create<AppState>((set, get) => ({
   initError: false,
   rev: 0,
   onboarded: false,
+  themeMode: 'system',
   stats: {
     streak: 0,
     lastStreakDate: null,
@@ -100,6 +103,7 @@ export const useApp = create<AppState>((set, get) => ({
         store,
         ready: true,
         onboarded: store.isOnboarded(),
+        themeMode: store.getThemeMode(),
         stats: store.getStats(),
       });
     } catch (e) {
@@ -111,6 +115,11 @@ export const useApp = create<AppState>((set, get) => ({
 
   bump() {
     set((s) => ({ rev: s.rev + 1 }));
+  },
+
+  setThemeMode(mode: ThemeMode) {
+    get().store?.setThemeMode(mode);
+    set({ themeMode: mode });
   },
 
   completeOnboarding() {

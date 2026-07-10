@@ -5,14 +5,14 @@
     "version": "0.1.0",
     "orientation": "portrait",
     "scheme": "xuexi",
-    "userInterfaceStyle": "dark",
+    "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
-    "backgroundColor": "#0B0B12",
+    "backgroundColor": "#0E1016",
     "icon": "./assets/icon.png",
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#0B0B12"
+      "backgroundColor": "#0E1016"
     },
     "assetBundlePatterns": [
       "assets/db/**",

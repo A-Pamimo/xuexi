@@ -6,6 +6,9 @@
 
 export type ToneNumber = 1 | 2 | 3 | 4 | 5; // 5 = neutral
 
+/** UI theme preference: follow the OS ('system') or force a mode. */
+export type ThemeMode = 'light' | 'dark' | 'system';
+
 /** A vocabulary item — the atomic unit of study. */
 export interface Word {
   id: number;
