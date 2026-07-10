@@ -55,6 +55,22 @@ export function xpForTone(correct: boolean): number {
   return correct ? 5 : 0;
 }
 
+/** Default daily XP goal — an honest, attainable target, not a moving goalpost. */
+export const DAILY_GOAL_XP = 40;
+
+/**
+ * Progress toward a day's XP goal. `into` is the XP genuinely earned that day;
+ * `ratio` is clamped to 0..1 so a big day can't over-fill the ring, and `met`
+ * flips true once the honest target is reached.
+ */
+export function goalProgress(
+  session: SessionLog,
+  goal: number,
+): { into: number; goal: number; ratio: number; met: boolean } {
+  const into = session.xpEarned;
+  return { into, goal, ratio: clamp01(into / goal), met: into >= goal };
+}
+
 /**
  * Earned (never random) reward multiplier — research P0-3 / guardrail #4: all
  * bonuses are performance-contingent, no chance-based slot-machine. Fires as a

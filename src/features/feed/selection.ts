@@ -5,7 +5,8 @@
  * already known (~90%). The feed mixes 70% review-due / 20% new i+1 / 10%
  * surprise cards as a variable reward. Pure and unit-tested.
  */
-import type { Sentence } from '../../lib/types';
+import type { Sentence, Word } from '../../lib/types';
+import { generateSentences } from './generate';
 
 const SURPRISE_TAGS = new Set(['chengyu', 'slang', 'meme', 'surprise']);
 
@@ -17,6 +18,13 @@ export interface FeedInputs {
   knownWordIds: Set<number>;
   dueWordIds: Set<number>;
   count: number;
+  /**
+   * When the curated pool can't fill `count` under the 85% floor, top up with
+   * template-generated i+1 sentences composed from this word list (see
+   * generate.ts). Omit it — the default — to disable generation entirely, so
+   * existing call sites and tests that pass no words behave exactly as before.
+   */
+  words?: Word[];
   rng?: () => number;
 }
 
@@ -81,6 +89,30 @@ export function selectFeed(inputs: FeedInputs): Sentence[] {
   take(surprise, quota.surprise);
   // Backfill any shortfall from whatever remains (keeps the feed infinite).
   take(shuffled, count - out.length);
+
+  // Curated pool exhausted below `count`? Top up with generated i+1 sentences so
+  // the feed never runs dry (content_strategy). Only when a word list is passed;
+  // generated cards are >=85% known by construction (in fact 100% known-plus-
+  // known-particle), so the floor holds, but we re-check it here to keep the
+  // invariant local and explicit — an ungrammatical or under-floor generated
+  // card is simply dropped rather than served. Generated ids are negative and
+  // thus can't collide with curated ids; `used` guards against that anyway.
+  if (out.length < count && inputs.words && inputs.words.length > 0) {
+    const generated = generateSentences({
+      words: inputs.words,
+      knownWordIds,
+      count: count - out.length,
+      rng,
+    });
+    for (const s of generated) {
+      if (out.length >= count) break;
+      if (used.has(s.id)) continue;
+      if (knownRatio(s, knownWordIds) < FEED_FLOOR_KNOWN_RATIO) continue;
+      used.add(s.id);
+      out.push(s);
+    }
+  }
+
   return out;
 }
 

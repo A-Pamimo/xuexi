@@ -1,7 +1,9 @@
 import {
   advanceStreak,
+  DAILY_GOAL_XP,
   dayQualifies,
   earnedReward,
+  goalProgress,
   levelForXp,
   levelProgress,
   rollingHitRate,
@@ -85,6 +87,33 @@ describe('earnedReward — performance-contingent, never random', () => {
   it('tone misses earn nothing; hits earn a base', () => {
     expect(xpForTone(false)).toBe(0);
     expect(xpForTone(true)).toBeGreaterThan(0);
+  });
+});
+
+describe('goalProgress — honest daily XP target', () => {
+  it('defaults to an attainable goal', () => {
+    expect(DAILY_GOAL_XP).toBe(40);
+  });
+
+  it('reports partial progress below goal', () => {
+    const g = goalProgress(session({ xpEarned: 10 }), 40);
+    expect(g.into).toBe(10);
+    expect(g.goal).toBe(40);
+    expect(g.ratio).toBeCloseTo(0.25);
+    expect(g.met).toBe(false);
+  });
+
+  it('is met exactly at the goal', () => {
+    const g = goalProgress(session({ xpEarned: 40 }), 40);
+    expect(g.ratio).toBe(1);
+    expect(g.met).toBe(true);
+  });
+
+  it('clamps ratio at 1 when over 100% and stays met', () => {
+    const g = goalProgress(session({ xpEarned: 100 }), 40);
+    expect(g.ratio).toBe(1);
+    expect(g.met).toBe(true);
+    expect(g.into).toBe(100); // raw XP still reported honestly
   });
 });
 

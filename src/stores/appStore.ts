@@ -6,16 +6,21 @@
  * components recompute derived views (due queue, known set, collection).
  */
 import { create } from 'zustand';
+import { configureAnalytics, track } from '../lib/analytics';
 import { Store } from '../lib/db/store';
 import {
   advanceStreak,
+  DAILY_GOAL_XP,
   dayQualifies,
   earnedReward,
+  goalProgress,
   levelForXp,
   xpForReview,
   xpForTone,
   type RewardRoll,
 } from '../lib/gamification';
+import * as juice from '../lib/juice';
+import { scheduleReminders, type ReminderPrefs } from '../lib/notifications';
 import { applyRating, isKnown, newCard, retrievabilityOf, selectDue } from '../lib/srs';
 import type { Card, Rating, ThemeMode, ToneDrillResult, UserStats, Word } from '../lib/types';
 
@@ -24,8 +29,10 @@ export function today(d: Date = new Date()): string {
 }
 
 // Highest-frequency HSK1 words used to bootstrap a "known" base at onboarding so
-// the i+1 feed has comprehensible content immediately.
-const BOOTSTRAP_HANZI = [
+// the i+1 feed has comprehensible content immediately. Exported so the onboarding
+// screen can preview a fully-comprehensible sentence against the SAME known set
+// that completeOnboarding() marks known (its "you just read Chinese" moment).
+export const BOOTSTRAP_HANZI = [
   '我', '你', '他', '她', '是', '很', '有', '这', '不', '的',
   '喜欢', '去', '吃', '喝', '看', '买', '写', '做', '学', '今天',
   '现在', '茶', '水', '米饭', '咖啡', '书', '苹果', '中文', '菜', '面包',
@@ -45,12 +52,16 @@ interface AppState {
   onboarded: boolean;
   themeMode: ThemeMode;
   stats: UserStats;
+  dailyGoal: number;
+  reminderPrefs: ReminderPrefs;
   store: Store | null;
 
   init(): Promise<void>;
   bump(): void;
   completeOnboarding(): void;
   setThemeMode(mode: ThemeMode): void;
+  goalToday(): { into: number; goal: number; ratio: number; met: boolean };
+  setReminderPrefs(prefs: ReminderPrefs): void;
 
   knownWordIds(): Set<number>;
   reviewQueue(limit?: number): QueueItem[];
@@ -93,19 +104,34 @@ export const useApp = create<AppState>((set, get) => ({
     level: 1,
     unlocks: [],
   },
+  dailyGoal: DAILY_GOAL_XP,
+  reminderPrefs: { enabled: false, hour: 19 },
   store: null,
 
   async init() {
     if (get().ready) return;
     try {
       const store = await Store.open();
+      // Wire the local analytics log through the store's persistence adapter so
+      // events survive a reload (offline write-through, never a network call).
+      configureAnalytics({
+        sink: {
+          read: () => store.getAnalytics(),
+          persist: (events) => store.setAnalytics(events),
+        },
+      });
       set({
         store,
         ready: true,
         onboarded: store.isOnboarded(),
         themeMode: store.getThemeMode(),
         stats: store.getStats(),
+        dailyGoal: store.getDailyGoal(),
+        reminderPrefs: store.getReminderPrefs(),
       });
+      track('session_start');
+      // Re-arm any stored daily reminder (no-op on web / when disabled).
+      void scheduleReminders(store.getReminderPrefs());
     } catch (e) {
       // Seed/persistence load failed — surface an error instead of an infinite spinner.
       console.error('xuexi init failed:', e);
@@ -122,7 +148,24 @@ export const useApp = create<AppState>((set, get) => ({
     set({ themeMode: mode });
   },
 
+  // Progress toward today's honest XP goal (see gamification.goalProgress). Reads
+  // live from the session so the ring reflects XP earned so far this day.
+  goalToday() {
+    const store = requireStore(get().store);
+    return goalProgress(store.getSession(today()), get().dailyGoal);
+  },
+
+  setReminderPrefs(prefs) {
+    const store = requireStore(get().store);
+    store.setReminderPrefs(prefs);
+    set({ reminderPrefs: prefs });
+    // Reconcile the on-device schedule (no-op on web / when disabled).
+    void scheduleReminders(prefs);
+  },
+
   completeOnboarding() {
+    // Note: the per-step `onboarding_step` analytics events are emitted by the
+    // onboarding screen (it owns the step flow); this only marks completion.
     const store = requireStore(get().store);
     const byHanzi = new Map(store.words.map((w) => [w.hanzi, w]));
     // Mark bootstrap words as known (reviewed Good) so the feed is comprehensible.
@@ -198,6 +241,7 @@ export const useApp = create<AppState>((set, get) => ({
   noteGloss(wordId) {
     const store = requireStore(get().store);
     const n = store.bumpGloss(wordId);
+    track('feed_word_glossed', { wordId, count: n });
     if (n >= 2 && !store.getCard(wordId)) {
       store.upsertCard(newCard(wordId));
       get().bump();
@@ -224,6 +268,8 @@ export const useApp = create<AppState>((set, get) => ({
       comboMax: Math.max(session.comboMax, combo),
     });
     applyXpAndStreak(store, get, set, gained, day);
+    track('review_graded', { rating, gained, combo });
+    maybeCelebrateGoal(store, get, day);
     get().bump();
     return { scheduledDays, reward, gained };
   },
@@ -241,6 +287,8 @@ export const useApp = create<AppState>((set, get) => ({
       comboMax: Math.max(session.comboMax, combo),
     });
     if (gained > 0) applyXpAndStreak(store, get, set, gained, day);
+    track('tone_answered', { correct, gained, combo });
+    if (gained > 0) maybeCelebrateGoal(store, get, day);
     get().bump();
     return { reward, gained };
   },
@@ -286,7 +334,26 @@ export function bySpokenFreq(a: Word, b: Word): number {
 }
 
 function maybeStreak(store: Store, stats: UserStats, day: string): UserStats {
-  return dayQualifies(store.getSession(day)) ? advanceStreak(stats, day) : stats;
+  if (!dayQualifies(store.getSession(day))) return stats;
+  const next = advanceStreak(stats, day);
+  // Emit only when the streak count actually moved (advanceStreak is a no-op
+  // once today is already counted) so the funnel logs real streak growth.
+  if (next.streak !== stats.streak) track('streak_advanced', { streak: next.streak });
+  return next;
+}
+
+/**
+ * Fire the goal-met celebration exactly once per day. Reads live session XP,
+ * checks the persisted per-day flag so a reload can't re-fire, and — the moment
+ * today's honest goal is first reached — plays the reward juice and logs it.
+ */
+function maybeCelebrateGoal(store: Store, get: () => AppState, day: string): void {
+  if (store.isGoalCelebrated(day)) return;
+  const progress = goalProgress(store.getSession(day), get().dailyGoal);
+  if (!progress.met) return;
+  store.markGoalCelebrated(day);
+  juice.reward();
+  track('goal_complete', { into: progress.into, goal: progress.goal });
 }
 
 function applyXpAndStreak(

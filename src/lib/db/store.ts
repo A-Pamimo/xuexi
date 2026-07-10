@@ -11,6 +11,9 @@
  * expo-sqlite web (wasm) path.
  */
 import rawSeed from '../../data/seed.json';
+import type { AnalyticsEvent } from '../analytics';
+import { DAILY_GOAL_XP } from '../gamification';
+import type { ReminderPrefs } from '../notifications';
 import type {
   AudioRef,
   Card,
@@ -40,6 +43,14 @@ interface ProgressBlob {
   glossCounts: Record<number, number>;
   /** UI theme preference. Defaults to 'system' (follow the OS). */
   themeMode: ThemeMode;
+  /** Daily XP goal — an honest, attainable target the learner works toward. */
+  dailyGoal: number;
+  /** Days on which the goal-met celebration already fired (fire-once guard). */
+  goalCelebrated: Record<string, boolean>;
+  /** Local daily-reminder settings. Off by default (opt-in, never nagging). */
+  reminderPrefs: ReminderPrefs;
+  /** Append-only local analytics log (offline only — never leaves the device). */
+  analytics: AnalyticsEvent[];
 }
 
 const DEFAULT_STATS: UserStats = {
@@ -62,6 +73,10 @@ function emptyProgress(): ProgressBlob {
     stats: { ...DEFAULT_STATS },
     glossCounts: {},
     themeMode: 'system',
+    dailyGoal: DAILY_GOAL_XP,
+    goalCelebrated: {},
+    reminderPrefs: { enabled: false, hour: 19 },
+    analytics: [],
   };
 }
 
@@ -110,6 +125,41 @@ export class Store {
   }
   setThemeMode(mode: ThemeMode): void {
     this.progress.themeMode = mode;
+    this.scheduleSave();
+  }
+
+  // --- daily goal ------------------------------------------------------------
+  getDailyGoal(): number {
+    return this.progress.dailyGoal;
+  }
+  setDailyGoal(goal: number): void {
+    this.progress.dailyGoal = goal;
+    this.scheduleSave();
+  }
+  /** Whether the goal-met celebration already fired on `date` (fire-once guard). */
+  isGoalCelebrated(date: string): boolean {
+    return this.progress.goalCelebrated[date] ?? false;
+  }
+  markGoalCelebrated(date: string): void {
+    this.progress.goalCelebrated[date] = true;
+    this.scheduleSave();
+  }
+
+  // --- reminder preferences --------------------------------------------------
+  getReminderPrefs(): ReminderPrefs {
+    return this.progress.reminderPrefs;
+  }
+  setReminderPrefs(prefs: ReminderPrefs): void {
+    this.progress.reminderPrefs = prefs;
+    this.scheduleSave();
+  }
+
+  // --- analytics log (local, offline-only) -----------------------------------
+  getAnalytics(): AnalyticsEvent[] {
+    return this.progress.analytics;
+  }
+  setAnalytics(events: AnalyticsEvent[]): void {
+    this.progress.analytics = events;
     this.scheduleSave();
   }
 
