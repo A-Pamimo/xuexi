@@ -17,6 +17,9 @@ const MIME = {
 const server = createServer(async (req, res) => {
   try {
     let p = decodeURIComponent((req.url ?? '/').split('?')[0]);
+    // The web export is built with baseUrl '/xuexi', so index.html requests
+    // assets under that prefix; serve DIST at the root by stripping it.
+    if (p.startsWith('/xuexi')) p = p.slice('/xuexi'.length) || '/';
     if (p === '/') p = '/index.html';
     let file = normalize(join(DIST, p));
     if (!file.startsWith(DIST)) return res.writeHead(403).end();
@@ -39,7 +42,10 @@ const port = server.address().port;
 const url = `http://127.0.0.1:${port}`;
 
 const browser = await chromium.launch({
-  executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
+  // CI installs Chromium via playwright and injects its path; the hardcoded path
+  // is the local dev-container fallback.
+  executablePath:
+    process.env.PW_EXECUTABLE_PATH || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
   args: ['--no-sandbox'],
 });
 const page = await browser.newPage();
@@ -60,15 +66,22 @@ await page.getByText('I hear the difference').click();
 await page.getByText('Enter the Tone Dojo').click();
 await page.getByText('Tone Dojo').first().waitFor({ timeout: 4000 });
 
-// Tabs present?
-await page.getByText('Feed').first().waitFor({ timeout: 4000 });
+// Tabs present? Target the tab bar by role so screen copy can't shadow a label.
+const tab = (name) => page.getByRole('tab', { name });
+await tab('Feed').waitFor({ timeout: 4000 });
 
 // Visit each tab and confirm it renders something meaningful.
-await page.getByText('Reviews').first().click();
-await page.getByText('Show answer').waitFor({ timeout: 5000 }); // a review is preloaded
-await page.getByText('Stats').first().click();
+await tab('Learn').click();
+// A fresh session leads with new words ("Got it — next") but may also surface a
+// due review ("Show answer"); accept either so the check isn't state-brittle.
+await page
+  .getByText('Got it — next →')
+  .or(page.getByText('Show answer'))
+  .first()
+  .waitFor({ timeout: 6000 });
+await tab('Stats').click();
 await page.getByText('Your progress').waitFor({ timeout: 5000 });
-await page.getByText('Feed').first().click();
+await tab('Feed').click();
 // Feed shows either sentences or the warm-up message.
 await page.waitForTimeout(800);
 
