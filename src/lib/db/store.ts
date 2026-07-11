@@ -43,6 +43,8 @@ interface ProgressBlob {
   glossCounts: Record<number, number>;
   /** UI theme preference. Defaults to 'system' (follow the OS). */
   themeMode: ThemeMode;
+  /** Show the pinyin pronunciation guide above hanzi in the Feed. On by default. */
+  showPinyin: boolean;
   /** Daily XP goal — an honest, attainable target the learner works toward. */
   dailyGoal: number;
   /** Days on which the goal-met celebration already fired (fire-once guard). */
@@ -73,6 +75,7 @@ function emptyProgress(): ProgressBlob {
     stats: { ...DEFAULT_STATS },
     glossCounts: {},
     themeMode: 'system',
+    showPinyin: true,
     dailyGoal: DAILY_GOAL_XP,
     goalCelebrated: {},
     reminderPrefs: { enabled: false, hour: 19 },
@@ -125,6 +128,15 @@ export class Store {
   }
   setThemeMode(mode: ThemeMode): void {
     this.progress.themeMode = mode;
+    this.scheduleSave();
+  }
+
+  // --- pinyin guide preference ----------------------------------------------
+  getShowPinyin(): boolean {
+    return this.progress.showPinyin;
+  }
+  setShowPinyin(show: boolean): void {
+    this.progress.showPinyin = show;
     this.scheduleSave();
   }
 

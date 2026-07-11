@@ -18,7 +18,7 @@ import {
 // off on web, on everywhere else.
 const NATIVE_DRIVER = Platform.OS !== 'web';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { elevation, font, HIT, radius, spacing, type } from '../theme';
+import { elevation, font, fonts, HIT, radius, spacing, type } from '../theme';
 import type { ThemeColors } from '../theme';
 import { useReducedMotion } from '../lib/motion';
 import { useTheme, type Scheme } from '../lib/appearance';
@@ -299,7 +299,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  btnLabel: { fontSize: font.body, fontWeight: '800' },
+  btnLabel: { fontSize: font.body, fontWeight: '800', fontFamily: fonts.sansBold },
   track: { borderRadius: radius.pill, overflow: 'hidden', width: '100%' },
   play: { alignItems: 'center', justifyContent: 'center' },
   playCircle: { alignItems: 'center', justifyContent: 'center', borderWidth: 2 },

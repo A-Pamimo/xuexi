@@ -15,16 +15,19 @@ import {
   View,
   type ViewToken,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Settings2 } from 'lucide-react-native';
 import { Body, Button, Caption, H1, Pill, PlayButton, Screen } from '../../components/ui';
 import { Hanzi, Pinyin } from '../../components/chinese';
 import { Ticker } from '../../components/Ticker';
 import { DailyGoalRing } from '../../components/DailyGoalRing';
+import { SettingsSheet } from '../../components/SettingsSheet';
 import { isAudioUnlocked, unlockAudio as unlockAudioGlobal } from '../../lib/audio';
 import * as juice from '../../lib/juice';
 import { useReducedMotion } from '../../lib/motion';
 import type { Sentence, Word } from '../../lib/types';
 import { useApp } from '../../stores/appStore';
-import { elevation, font, radius, spacing } from '../../theme';
+import { elevation, font, fonts, radius, spacing } from '../../theme';
 import type { ThemeColors } from '../../theme';
 import { useTheme, useThemedStyles } from '../../lib/appearance';
 import { AmbientBackground } from '../../components/AmbientBackground';
@@ -51,13 +54,17 @@ export function FeedScreen() {
   // ring tracks XP as it accrues (same reactivity path as dueCount below).
   const rev = useApp((s) => s.rev);
   const goalToday = useApp((s) => s.goalToday);
+  const showPinyin = useApp((s) => s.showPinyin);
+  const setShowPinyin = useApp((s) => s.setShowPinyin);
   const { height } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const { colors } = useTheme();
   const styles = useThemedStyles(makeStyles);
   const reduce = useReducedMotion();
 
-  const [showPinyin, setShowPinyin] = useState(true);
   const [selected, setSelected] = useState<Word | null>(null);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   // `rev` is read purely to re-render this screen as XP accrues; goalToday()
   // then pulls the fresh figures. Referenced so strict/noUnused stays happy.
@@ -111,8 +118,10 @@ export function FeedScreen() {
   }, [addFeedSeconds]);
 
   const onViewable = useRef(({ viewableItems }: { viewableItems: ViewToken[] }) => {
-    const first = viewableItems[0]?.item as Sentence | undefined;
-    if (first && isAudioUnlocked()) void playSentence(store, first);
+    const first = viewableItems[0];
+    if (first?.index != null) setCurrentIndex(first.index);
+    const sentence = first?.item as Sentence | undefined;
+    if (sentence && isAudioUnlocked()) void playSentence(store, sentence);
   }).current;
 
   const tokenize = useCallback(
@@ -233,10 +242,19 @@ export function FeedScreen() {
 
       <View style={styles.overlay} pointerEvents="box-none">
         <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Settings"
+          hitSlop={8}
+          onPress={() => { juice.tap(); setSettingsOpen(true); }}
+          style={styles.gear}
+        >
+          <Settings2 size={20} color={colors.textDim} strokeWidth={2} />
+        </Pressable>
+        <Pressable
           accessibilityRole="switch"
           accessibilityState={{ checked: showPinyin }}
           accessibilityLabel="Toggle pinyin"
-          onPress={() => { unlockAudio(); setShowPinyin((p) => !p); }}
+          onPress={() => { unlockAudio(); setShowPinyin(!showPinyin); }}
         >
           <Pill tone={showPinyin ? 'active' : 'default'}>
             <Body style={{ fontWeight: '700', fontSize: 14 }}>Pinyin {showPinyin ? 'on' : 'off'}</Body>
@@ -246,6 +264,13 @@ export function FeedScreen() {
           <Caption>due {dueCount()}</Caption>
         </Pill>
       </View>
+
+      {/* Paper-ink progress dots — calm, bounded sense of place in the feed. */}
+      <View style={[styles.progressDots, { top: insets.top + spacing(1.5) }]} pointerEvents="none">
+        <FeedProgress total={feed.length} index={currentIndex} colors={colors} />
+      </View>
+
+      <SettingsSheet open={settingsOpen} onClose={() => setSettingsOpen(false)} />
 
       {/* B2: inline gloss peek — a bottom sheet that keeps the sentence visible
           above it (no scrim). Blooms in unless reduced motion. */}
@@ -350,6 +375,35 @@ function GlossPeek({
   );
 }
 
+/**
+ * Bounded progress bars, paper-ink style. The feed tops up endlessly, so instead
+ * of one dot per (up to 40) sentence we render at most MAX bars representing
+ * position proportionally: bars before the marker are done, the marker is the
+ * current spot, the rest are ahead.
+ */
+function FeedProgress({ total, index, colors }: { total: number; index: number; colors: ThemeColors }) {
+  const MAX = 7;
+  const count = Math.min(Math.max(total, 1), MAX);
+  const activeExact = total <= 1 ? 0 : (index / (total - 1)) * (count - 1);
+  const active = Math.round(activeExact);
+  return (
+    <>
+      {Array.from({ length: count }).map((_, i) => (
+        <View
+          key={i}
+          style={{
+            height: 5,
+            width: 26,
+            borderRadius: radius.pill,
+            backgroundColor:
+              i < active ? colors.primary : i === active ? colors.primaryDim : colors.border,
+          }}
+        />
+      ))}
+    </>
+  );
+}
+
 const makeStyles = (c: ThemeColors) =>
   StyleSheet.create({
     root: { flex: 1 }, // transparent — ambient backdrop shows through
@@ -362,17 +416,35 @@ const makeStyles = (c: ThemeColors) =>
     tokenWord: {
       color: c.text,
       fontSize: font.hanziM,
-      fontWeight: '700',
+      fontFamily: fonts.serif,
       textDecorationLine: 'underline',
       textDecorationColor: c.primary,
     },
-    tokenPlain: { color: c.textDim, fontSize: font.hanziM, fontWeight: '700' },
+    tokenPlain: { color: c.textDim, fontSize: font.hanziM, fontFamily: fonts.serif },
     overlay: {
       position: 'absolute',
       top: spacing(6),
       right: spacing(2),
       gap: spacing(1),
       alignItems: 'flex-end',
+    },
+    gear: {
+      width: 40,
+      height: 40,
+      borderRadius: radius.pill,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: c.surface,
+      borderWidth: 1,
+      borderColor: c.border,
+    },
+    progressDots: {
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      flexDirection: 'row',
+      justifyContent: 'center',
+      gap: spacing(0.75),
     },
     ringOverlay: { position: 'absolute', top: spacing(6), left: spacing(2) },
     goalBanner: {

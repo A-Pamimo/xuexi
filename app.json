@@ -40,8 +40,11 @@
       "expo-sqlite",
       [
         "expo-av",
-        { "microphonePermission": false }
-      ]
+        {
+          "microphonePermission": false
+        }
+      ],
+      "expo-font"
     ],
     "experiments": {
       "typedRoutes": true,

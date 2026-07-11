@@ -4,6 +4,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { syllableToMarks, toneNumbersOf } from '../lib/pinyin';
 import { useScramble } from './ScrambleText';
 import { useTheme } from '../lib/appearance';
+import { fonts } from '../theme';
 
 export function Hanzi({
   text,
@@ -17,7 +18,9 @@ export function Hanzi({
 }) {
   const { colors } = useTheme();
   const disp = useScramble(text, { kind: 'hanzi', enabled: !!reveal });
-  return <Text style={{ color: colors.text, fontSize: size, fontWeight: '700' }}>{disp}</Text>;
+  return (
+    <Text style={{ color: colors.text, fontSize: size, fontFamily: fonts.serif }}>{disp}</Text>
+  );
 }
 
 /**
@@ -39,7 +42,7 @@ function Syllable({
 }) {
   const disp = useScramble(marked, { kind: 'pinyin', enabled: reveal });
   return (
-    <Text style={{ fontSize: size, fontWeight: '600', color }}>
+    <Text style={{ fontSize: size, fontFamily: fonts.sansSemibold, color }}>
       {disp}
       {trailingSpace ? ' ' : ''}
     </Text>

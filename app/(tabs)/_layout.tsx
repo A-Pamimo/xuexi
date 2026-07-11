@@ -1,14 +1,11 @@
 import { Redirect, Tabs } from 'expo-router';
 import React from 'react';
-import { Text } from 'react-native';
+import { BarChart2, BookOpen, Layers, Mic2 } from 'lucide-react-native';
+import { fonts } from '../../src/theme';
 import { useApp } from '../../src/stores/appStore';
 import { unlockAudio } from '../../src/lib/audio';
 import * as juice from '../../src/lib/juice';
 import { useTheme } from '../../src/lib/appearance';
-
-function Icon({ label, color }: { label: string; color: string }) {
-  return <Text style={{ fontSize: 20, color }}>{label}</Text>;
-}
 
 export default function TabsLayout() {
   const onboarded = useApp((s) => s.onboarded);
@@ -34,11 +31,16 @@ export default function TabsLayout() {
         tabBarStyle: {
           backgroundColor: colors.bgElevated,
           borderTopColor: colors.border,
-          height: 64,
-          paddingBottom: 8,
+          height: 68,
+          paddingBottom: 10,
           paddingTop: 8,
         },
-        tabBarLabelStyle: { fontSize: 11, fontWeight: '700' },
+        tabBarLabelStyle: {
+          fontSize: 10,
+          fontFamily: fonts.sansBold,
+          letterSpacing: 0.6,
+          textTransform: 'uppercase',
+        },
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textDim,
       }}
@@ -47,28 +49,28 @@ export default function TabsLayout() {
         name="index"
         options={{
           title: 'Feed',
-          tabBarIcon: ({ color }) => <Icon label="📜" color={color} />,
+          tabBarIcon: ({ color }) => <Layers size={22} color={color} strokeWidth={2} />,
         }}
       />
       <Tabs.Screen
         name="reviews"
         options={{
           title: 'Learn',
-          tabBarIcon: ({ color }) => <Icon label="📚" color={color} />,
+          tabBarIcon: ({ color }) => <BookOpen size={22} color={color} strokeWidth={2} />,
         }}
       />
       <Tabs.Screen
         name="dojo"
         options={{
           title: 'Tone Dojo',
-          tabBarIcon: ({ color }) => <Icon label="🥋" color={color} />,
+          tabBarIcon: ({ color }) => <Mic2 size={22} color={color} strokeWidth={2} />,
         }}
       />
       <Tabs.Screen
         name="stats"
         options={{
           title: 'Stats',
-          tabBarIcon: ({ color }) => <Icon label="📊" color={color} />,
+          tabBarIcon: ({ color }) => <BarChart2 size={22} color={color} strokeWidth={2} />,
         }}
       />
     </Tabs>
