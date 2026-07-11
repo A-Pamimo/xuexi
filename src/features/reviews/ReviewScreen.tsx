@@ -10,14 +10,18 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Body, Button, Caption, Card, H1, Label, PlayButton, ProgressBar, Screen } from '../../components/ui';
 import { Hanzi, Pinyin } from '../../components/chinese';
+import { DailyGoalRing } from '../../components/DailyGoalRing';
 import { Ticker } from '../../components/Ticker';
 import { stopAudio } from '../../lib/audio';
+import type { Store } from '../../lib/db/store';
 import * as juice from '../../lib/juice';
-import type { Rating, Word } from '../../lib/types';
-import { useApp } from '../../stores/appStore';
+import type { Rating, Sentence, Word } from '../../lib/types';
+import { useApp, type QueueItem } from '../../stores/appStore';
 import { font, radius, spacing } from '../../theme';
 import { useTheme } from '../../lib/appearance';
+import { knownRatio } from '../feed/selection';
 import { playWord } from '../shared/play';
+import { BuildExercise } from './BuildExercise';
 
 const RATINGS: { rating: Rating; label: string; variant: 'bad' | 'ghost' | 'good' }[] = [
   { rating: 'again', label: 'Again', variant: 'bad' },
@@ -26,12 +30,46 @@ const RATINGS: { rating: Rating; label: string; variant: 'bad' | 'ghost' | 'good
   { rating: 'easy', label: 'Easy', variant: 'good' },
 ];
 
+// A card is "mature" enough to earn a production exercise once it's a settled
+// Review card (ts-fsrs State.Review = 2) with a decent stability — recognition
+// is solid, so we occasionally push for production (research U3). We only build
+// from a COMPREHENSIBLE sentence (>=85% of its words known, mirroring the feed
+// floor) so the exercise stays i+1, not a wall of unknowns.
+const BUILD_MIN_STABILITY = 7; // days
+const BUILD_KNOWN_FLOOR = 0.85;
+
+/**
+ * Occasionally (~1 in 4 eligible) swap the plain recall flip for a "build the
+ * sentence" production drill, when the word is mature and a comprehensible
+ * sentence containing it exists. Deterministic in the word id so the choice is
+ * stable across re-renders (no flicker) — same idiom as the recall `mode` above.
+ */
+function buildSentenceFor(
+  item: QueueItem,
+  store: Store,
+  known: Set<number>,
+): Sentence | null {
+  if (item.isNew) return null;
+  if (item.card.state !== 2 || item.card.stability < BUILD_MIN_STABILITY) return null;
+  if (item.word.id % 4 !== 0) return null; // keep it occasional
+  const candidates = store.sentences.filter(
+    (s) =>
+      s.wordIds.includes(item.word.id) &&
+      s.wordIds.length >= 2 &&
+      knownRatio(s, known) >= BUILD_KNOWN_FLOOR,
+  );
+  if (candidates.length === 0) return null;
+  // Stable pick: index the candidate pool by the word id.
+  return candidates[item.word.id % candidates.length] ?? null;
+}
+
 export function ReviewScreen() {
   const router = useRouter();
   const store = useApp((s) => s.store)!;
   const reviewWord = useApp((s) => s.reviewWord);
   const reviewQueue = useApp((s) => s.reviewQueue);
   const knownWordIds = useApp((s) => s.knownWordIds);
+  const goalToday = useApp((s) => s.goalToday);
   const { colors } = useTheme();
 
   const queue = useMemo(() => reviewQueue(20), [reviewQueue]);
@@ -47,6 +85,15 @@ export function ReviewScreen() {
 
   const item = queue[idx];
   const isNew = !!item?.isNew;
+
+  // Occasional production drill for mature cards: reconstruct a comprehensible
+  // sentence containing this word instead of a plain recall flip (C1). Null when
+  // ineligible or not this card's turn. Recomputed per card (the queue and known
+  // set are stable within a session).
+  const buildSentence = useMemo<Sentence | null>(
+    () => (item ? buildSentenceFor(item, store, knownWordIds()) : null),
+    [item, store, knownWordIds],
+  );
 
   // Recall prompt mode (reviews only): audio->meaning or hanzi->meaning.
   const mode = useMemo<'hanzi' | 'audio'>(() => {
@@ -123,13 +170,54 @@ export function ReviewScreen() {
     setIdx((i) => i + 1);
   };
 
+  // Production drill result → the same XP/combo/session pipeline as a graded
+  // recall: a correct build is a 'good', a miss is an 'again' (breaks the combo,
+  // earns no bonus). BuildExercise handles its own correct/wrong juice, so we
+  // don't double up here — we only run the combo reward flash on a bonus roll.
+  const buildDone = (correct: boolean) => {
+    const nextCombo = correct ? combo + 1 : 0;
+    const { reward, gained } = reviewWord(item.word.id, correct ? 'good' : 'again', nextCombo);
+    if (correct) {
+      setCombo(nextCombo);
+      setMaxCombo((m) => Math.max(m, nextCombo));
+      if (reward.multiplier > 1) {
+        juice.reward();
+        setFlash(`${reward.golden ? '🌟' : '🔥'} combo ${nextCombo} · ${reward.multiplier}× XP!`);
+      }
+    } else {
+      setCombo(0);
+    }
+    setReviewed((n) => n + 1);
+    setGainedXp((x) => x + gained);
+    setTimeout(() => setFlash(null), 700);
+    setIdx((i) => i + 1);
+  };
+
+  // Mature-card production drill takes over the whole card (its own Screen).
+  if (buildSentence) {
+    return <BuildExercise sentence={buildSentence} onDone={buildDone} />;
+  }
+
+  const goal = goalToday();
+
   return (
     <Screen ambient>
       <View style={styles.header}>
-        <Caption>
-          {isNew ? '✨ Learn' : '🔁 Review'} · {idx + 1}/{queue.length}
-        </Caption>
-        {isNew ? <Caption>learning</Caption> : <ComboMeter combo={combo} />}
+        <View style={styles.headerStatus}>
+          <Caption>
+            {isNew ? '✨ Learn' : '🔁 Review'} · {idx + 1}/{queue.length}
+          </Caption>
+          <View style={{ marginTop: spacing(1) }}>
+            {isNew ? <Caption>learning</Caption> : <ComboMeter combo={combo} />}
+          </View>
+        </View>
+        <DailyGoalRing
+          ratio={goal.ratio}
+          into={goal.into}
+          goal={goal.goal}
+          met={goal.met}
+          size={64}
+        />
       </View>
       <View style={{ marginTop: spacing(1) }}>
         <ProgressBar
@@ -262,6 +350,7 @@ function ComboMeter({ combo }: { combo: number }) {
 
 const styles = StyleSheet.create({
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  headerStatus: { flex: 1, alignItems: 'flex-start' },
   prompt: { alignItems: 'center', paddingVertical: spacing(3.5), marginTop: spacing(2) },
   answer: { alignItems: 'center', marginTop: spacing(3) },
   ratings: { flexDirection: 'row', marginBottom: spacing(1) },

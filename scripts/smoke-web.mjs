@@ -59,10 +59,18 @@ await page.goto(url, { waitUntil: 'load' });
 await page.getByText('Welcome to xuexi').waitFor({ timeout: 8000 });
 const tReady = Date.now() - t0;
 
-// Drive onboarding -> tone primer -> finish -> lands in Tone Dojo (a completable action).
+// Drive onboarding -> first-word win -> tone primer -> finish -> lands in Tone
+// Dojo (a completable action).
 await page.getByText("Let's go").click();
+// "Your first word": tap the correct gloss ("tea"), then advance.
+await page.getByText('Your first word').waitFor({ timeout: 4000 });
+await page.getByRole('button', { name: 'tea' }).click();
+await page.getByText('Keep going').click();
 await page.getByText('The four tones').waitFor({ timeout: 4000 });
 await page.getByText('I hear the difference').click();
+// "You just read Chinese" comprehensible-input reveal, then advance.
+await page.getByText('You just read Chinese').waitFor({ timeout: 4000 });
+await page.getByText("Let's train").click();
 await page.getByText('Enter the Tone Dojo').click();
 await page.getByText('Tone Dojo').first().waitFor({ timeout: 4000 });
 

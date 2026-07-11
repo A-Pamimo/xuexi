@@ -9,6 +9,7 @@ import Svg, { Rect } from 'react-native-svg';
 import { Body, Caption, Card, Display, H1, H2, ProgressBar, Screen } from '../../components/ui';
 import { Hanzi, Pinyin } from '../../components/chinese';
 import { ThemeToggle } from '../../components/ThemeToggle';
+import { ReminderSettings } from '../../components/ReminderSettings';
 import { levelProgress, rollingHitRate } from '../../lib/gamification';
 import { useReducedMotion } from '../../lib/motion';
 import { isKnown } from '../../lib/srs';
@@ -100,6 +101,9 @@ export function StatsScreen() {
 
         <View style={styles.section}><H2>Appearance</H2></View>
         <ThemeToggle />
+
+        <View style={styles.section}><H2>Reminders</H2></View>
+        <ReminderSettings />
       </ScrollView>
     </Screen>
   );

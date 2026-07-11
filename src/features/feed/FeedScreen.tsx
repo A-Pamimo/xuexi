@@ -5,7 +5,10 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Animated,
+  Easing,
   FlatList,
+  Platform,
   Pressable,
   StyleSheet,
   useWindowDimensions,
@@ -15,17 +18,21 @@ import {
 import { Body, Button, Caption, H1, Pill, PlayButton, Screen } from '../../components/ui';
 import { Hanzi, Pinyin } from '../../components/chinese';
 import { Ticker } from '../../components/Ticker';
+import { DailyGoalRing } from '../../components/DailyGoalRing';
 import { isAudioUnlocked, unlockAudio as unlockAudioGlobal } from '../../lib/audio';
 import * as juice from '../../lib/juice';
+import { useReducedMotion } from '../../lib/motion';
 import type { Sentence, Word } from '../../lib/types';
 import { useApp } from '../../stores/appStore';
-import { elevation, font, luminance, radius, spacing } from '../../theme';
+import { elevation, font, radius, spacing } from '../../theme';
 import type { ThemeColors } from '../../theme';
 import { useTheme, useThemedStyles } from '../../lib/appearance';
 import { AmbientBackground } from '../../components/AmbientBackground';
 import { AMBIENT_BACKGROUND } from '../../lib/flags';
 import { selectFeed } from './selection';
 import { playSentence, playWord } from '../shared/play';
+
+const NATIVE_DRIVER = Platform.OS !== 'web';
 
 interface Token {
   text: string;
@@ -40,12 +47,28 @@ export function FeedScreen() {
   const addFeedSeconds = useApp((s) => s.addFeedSeconds);
   const addWord = useApp((s) => s.addWord);
   const noteGloss = useApp((s) => s.noteGloss);
+  // `rev` bumps on every scored mutation; subscribing re-runs goalToday() so the
+  // ring tracks XP as it accrues (same reactivity path as dueCount below).
+  const rev = useApp((s) => s.rev);
+  const goalToday = useApp((s) => s.goalToday);
   const { height } = useWindowDimensions();
   const { colors } = useTheme();
   const styles = useThemedStyles(makeStyles);
+  const reduce = useReducedMotion();
 
   const [showPinyin, setShowPinyin] = useState(true);
   const [selected, setSelected] = useState<Word | null>(null);
+
+  // `rev` is read purely to re-render this screen as XP accrues; goalToday()
+  // then pulls the fresh figures. Referenced so strict/noUnused stays happy.
+  void rev;
+  const goal = goalToday();
+  // The finish-line banner is dismissible (non-blocking); reset the dismissal
+  // if a fresh day pushes the goal back below the line.
+  const [goalBannerDismissed, setGoalBannerDismissed] = useState(false);
+  useEffect(() => {
+    if (!goal.met) setGoalBannerDismissed(false);
+  }, [goal.met]);
 
   // Web blocks autoplay until a user gesture; don't fire scroll-to-play until then
   // (otherwise it silently no-ops). Gating now lives in audio.ts so nav SFX and
@@ -66,7 +89,15 @@ export function FeedScreen() {
         .filter((c) => new Date(c.due).getTime() <= Date.now())
         .map((c) => c.wordId),
     );
-    return selectFeed({ sentences: store.sentences, knownWordIds: known, dueWordIds: due, count: 40 });
+    // Pass the full word list so the feed tops up with generated i+1 sentences
+    // when the curated pool thins — the "never run dry" guarantee (generate.ts).
+    return selectFeed({
+      sentences: store.sentences,
+      knownWordIds: known,
+      dueWordIds: due,
+      count: 40,
+      words: store.words,
+    });
   }, [store, knownWordIds]);
 
   // Accumulate feed time while this screen is mounted.
@@ -179,6 +210,27 @@ export function FeedScreen() {
         </View>
       ) : null}
 
+      {/* A1: daily-goal ring, top-left, mirrors the pills' top inset. */}
+      <View style={styles.ringOverlay} pointerEvents="none">
+        <DailyGoalRing ratio={goal.ratio} into={goal.into} goal={goal.goal} met={goal.met} size={56} />
+      </View>
+
+      {/* A1: the finish line — a non-blocking, dismissible banner once met. */}
+      {goal.met && !goalBannerDismissed ? (
+        <View style={styles.goalBanner} pointerEvents="box-none">
+          <Pressable
+            style={styles.goalBannerInner}
+            accessibilityRole="button"
+            accessibilityLabel="Today's goal is done. Dismiss."
+            onPress={() => { juice.tap(); setGoalBannerDismissed(true); }}
+          >
+            <Caption style={{ color: colors.gold, textAlign: 'center' }}>
+              🎉 today's goal is done — keep going or come back tomorrow  ✕
+            </Caption>
+          </Pressable>
+        </View>
+      ) : null}
+
       <View style={styles.overlay} pointerEvents="box-none">
         <Pressable
           accessibilityRole="switch"
@@ -195,34 +247,106 @@ export function FeedScreen() {
         </Pill>
       </View>
 
-      {selected ? (
-        <Pressable
-          style={styles.modalBg}
-          accessibilityViewIsModal
-          accessibilityLabel="Word details"
-          onPress={() => setSelected(null)}
-        >
-          <Pressable style={styles.modal} onPress={() => {}}>
-            <Hanzi text={selected.hanzi} size={font.hanziL} />
-            <View style={{ marginTop: spacing(1) }}>
-              <Pinyin numbered={selected.pinyinNumbered} size={22} />
-            </View>
-            <Body dim style={{ marginTop: spacing(1.5), textAlign: 'center' }}>{selected.glossEn}</Body>
-            <View style={styles.modalActions}>
-              <PlayButton size={26} play={() => playWord(store, selected.id)} accessibilityLabel="Play word audio" />
-              <Button
-                label={store.getCard(selected.id) ? 'In Learn ✓' : '＋ Add to Learn'}
-                onPress={() => {
-                  if (addWord(selected.id)) juice.correct();
-                  setSelected(null);
-                }}
-                style={{ flex: 1 }}
-              />
-            </View>
-          </Pressable>
-        </Pressable>
-      ) : null}
+      {/* B2: inline gloss peek — a bottom sheet that keeps the sentence visible
+          above it (no scrim). Blooms in unless reduced motion. */}
+      <GlossPeek
+        word={selected}
+        reduce={reduce}
+        styles={styles}
+        inLearn={selected ? !!store.getCard(selected.id) : false}
+        onPlay={() => (selected ? playWord(store, selected.id) : false)}
+        onAdd={() => {
+          if (selected && addWord(selected.id)) juice.correct();
+          setSelected(null);
+        }}
+        onClose={() => { juice.tap(); setSelected(null); }}
+      />
     </View>
+  );
+}
+
+/**
+ * B2 inline gloss: a non-blocking bottom peek. It stays mounted through the
+ * close animation (rendered from a lingering `shown` word) so it can slide out
+ * rather than vanish. Reduced motion commits the final frame with no travel.
+ */
+function GlossPeek({
+  word,
+  reduce,
+  styles,
+  inLearn,
+  onPlay,
+  onAdd,
+  onClose,
+}: {
+  word: Word | null;
+  reduce: boolean;
+  styles: ReturnType<typeof makeStyles>;
+  inLearn: boolean;
+  onPlay: () => Promise<boolean> | boolean;
+  onAdd: () => void;
+  onClose: () => void;
+}) {
+  // Keep the last word around while animating out so its content is drawn.
+  const [shown, setShown] = useState<Word | null>(word);
+  const anim = useRef(new Animated.Value(word ? 1 : 0)).current;
+
+  useEffect(() => {
+    if (word) setShown(word);
+    const to = word ? 1 : 0;
+    if (reduce) {
+      anim.setValue(to);
+      return;
+    }
+    const a = Animated.timing(anim, {
+      toValue: to,
+      duration: 200,
+      easing: to ? Easing.out(Easing.quad) : Easing.in(Easing.quad),
+      useNativeDriver: NATIVE_DRIVER,
+    });
+    a.start(({ finished }) => {
+      // Once fully closed, drop the content so it stops intercepting focus.
+      if (finished && to === 0) setShown(null);
+    });
+    return () => a.stop();
+  }, [word, reduce, anim]);
+
+  if (!shown) return null;
+
+  const translateY = anim.interpolate({ inputRange: [0, 1], outputRange: [24, 0] });
+
+  return (
+    <Animated.View
+      style={[styles.peek, { opacity: anim, transform: [{ translateY }] }]}
+      pointerEvents={word ? 'auto' : 'none'}
+      accessibilityLabel="Word details"
+    >
+      <View style={styles.peekHead}>
+        <View style={styles.peekWord}>
+          <Hanzi text={shown.hanzi} size={font.hanziM} />
+          <View style={{ marginTop: spacing(0.5) }}>
+            <Pinyin numbered={shown.pinyinNumbered} size={18} />
+          </View>
+          <Body dim style={{ marginTop: spacing(0.5) }}>{shown.glossEn}</Body>
+        </View>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Close word details"
+          hitSlop={12}
+          onPress={onClose}
+        >
+          <Caption>✕</Caption>
+        </Pressable>
+      </View>
+      <View style={styles.peekActions}>
+        <PlayButton size={22} play={onPlay} accessibilityLabel="Play word audio" />
+        <Button
+          label={inLearn ? 'In Learn ✓' : '＋ Add to Learn'}
+          onPress={onAdd}
+          style={{ flex: 1 }}
+        />
+      </View>
+    </Animated.View>
   );
 }
 
@@ -250,34 +374,43 @@ const makeStyles = (c: ThemeColors) =>
       gap: spacing(1),
       alignItems: 'flex-end',
     },
-    streakRibbon: { position: 'absolute', bottom: spacing(1), left: spacing(2), right: spacing(2) },
-    modalBg: {
+    ringOverlay: { position: 'absolute', top: spacing(6), left: spacing(2) },
+    goalBanner: {
       position: 'absolute',
-      top: 0,
-      bottom: 0,
-      left: 0,
-      right: 0,
-      // Scrim tuned per mode — a heavy black veil reads wrong over a light app.
-      backgroundColor: luminance(c.bg) > 0.5 ? 'rgba(20,22,30,0.35)' : 'rgba(0,0,0,0.7)',
-      justifyContent: 'center',
+      top: spacing(6),
+      left: spacing(11),
+      right: spacing(11),
       alignItems: 'center',
-      padding: spacing(3),
     },
-    modal: {
+    goalBannerInner: {
+      backgroundColor: c.surface,
+      borderRadius: radius.lg,
+      borderWidth: 1,
+      borderColor: c.gold,
+      paddingVertical: spacing(1),
+      paddingHorizontal: spacing(1.5),
+      ...elevation.card,
+    },
+    streakRibbon: { position: 'absolute', bottom: spacing(1), left: spacing(2), right: spacing(2) },
+    // Inline gloss peek — anchored to the bottom, sentence stays visible above.
+    peek: {
+      position: 'absolute',
+      left: spacing(2),
+      right: spacing(2),
+      bottom: spacing(4),
       backgroundColor: c.surface,
       borderRadius: radius.xl,
       borderWidth: 1,
       borderColor: c.borderStrong,
-      padding: spacing(3),
-      alignItems: 'center',
-      minWidth: 300,
+      padding: spacing(2.5),
       ...elevation.modal,
     },
-    modalActions: {
+    peekHead: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
+    peekWord: { flex: 1 },
+    peekActions: {
       flexDirection: 'row',
       alignItems: 'center',
-      marginTop: spacing(2.5),
+      marginTop: spacing(2),
       gap: spacing(1.5),
-      alignSelf: 'stretch',
     },
   });
