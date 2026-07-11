@@ -19,7 +19,10 @@ export type EventName =
   | 'goal_complete'
   | 'streak_advanced'
   | 'feed_word_glossed'
-  | 'onboarding_step';
+  | 'onboarding_step'
+  | 'cloud_synced'
+  | 'sign_in'
+  | 'sign_out';
 
 /** A single append-only record. `ts` is an ISO timestamp; props are flat scalars. */
 export interface AnalyticsEvent {

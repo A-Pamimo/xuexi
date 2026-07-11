@@ -11,6 +11,7 @@ import { Body, Caption, Card, Display, H1, H2, ProgressBar, Screen } from '../..
 import { Hanzi, Pinyin } from '../../components/chinese';
 import { ThemeToggle } from '../../components/ThemeToggle';
 import { ReminderSettings } from '../../components/ReminderSettings';
+import { AccountCard } from '../../components/AccountCard';
 import { levelProgress, rollingHitRate } from '../../lib/gamification';
 import { useReducedMotion } from '../../lib/motion';
 import { isKnown } from '../../lib/srs';
@@ -23,6 +24,7 @@ import { useTheme } from '../../lib/appearance';
 export function StatsScreen() {
   const store = useApp((s) => s.store)!;
   const stats = useApp((s) => s.stats);
+  const cloudConfigured = useApp((s) => s.cloudConfigured);
   useApp((s) => s.rev); // re-render on mutations
   const { colors } = useTheme();
 
@@ -99,6 +101,13 @@ export function StatsScreen() {
         <Card>
           <WeeklyRecap />
         </Card>
+
+        {cloudConfigured ? (
+          <>
+            <View style={styles.section}><H2>Account</H2></View>
+            <AccountCard />
+          </>
+        ) : null}
 
         <View style={styles.section}><H2>Appearance</H2></View>
         <ThemeToggle />

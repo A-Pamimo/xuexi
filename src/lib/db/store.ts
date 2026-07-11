@@ -33,7 +33,7 @@ interface Seed {
   audioRefs: AudioRef[];
 }
 
-interface ProgressBlob {
+export interface ProgressBlob {
   onboarded: boolean;
   cards: Record<number, Card>;
   toneResults: ToneDrillResult[];
@@ -66,7 +66,7 @@ const DEFAULT_STATS: UserStats = {
   unlocks: [],
 };
 
-function emptyProgress(): ProgressBlob {
+export function emptyProgress(): ProgressBlob {
   return {
     onboarded: false,
     cards: {},
@@ -90,6 +90,7 @@ export class Store {
   private readonly wordById: Map<number, Word>;
   private progress: ProgressBlob = emptyProgress();
   private saveTimer: ReturnType<typeof setTimeout> | null = null;
+  private flushListeners: Array<(blob: ProgressBlob) => void> = [];
 
   private constructor(seed: Seed, private readonly persistence: Persistence) {
     this.words = seed.words;
@@ -250,6 +251,27 @@ export class Store {
     this.scheduleSave();
   }
 
+  // --- cloud sync bridge -----------------------------------------------------
+  /** The live progress blob (by reference — clone before mutating). */
+  snapshot(): ProgressBlob {
+    return this.progress;
+  }
+  /** Replace the whole blob (used after a cloud merge) and persist locally. */
+  replaceProgress(blob: ProgressBlob): void {
+    this.progress = { ...emptyProgress(), ...blob };
+    this.scheduleSave();
+  }
+  /**
+   * Subscribe to local persistence flushes — the single choke point for every
+   * mutation — so the cloud layer can push changes up. Returns an unsubscribe.
+   */
+  onFlush(cb: (blob: ProgressBlob) => void): () => void {
+    this.flushListeners.push(cb);
+    return () => {
+      this.flushListeners = this.flushListeners.filter((f) => f !== cb);
+    };
+  }
+
   // --- persistence (debounced write-through) ---------------------------------
   private scheduleSave(): void {
     if (this.saveTimer) clearTimeout(this.saveTimer);
@@ -258,5 +280,6 @@ export class Store {
   async flush(): Promise<void> {
     this.saveTimer = null;
     await this.persistence.save(JSON.stringify(this.progress));
+    for (const cb of this.flushListeners) cb(this.progress);
   }
 }

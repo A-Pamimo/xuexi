@@ -10,7 +10,7 @@ import { useTheme } from '../../src/lib/appearance';
 export default function TabsLayout() {
   const onboarded = useApp((s) => s.onboarded);
   const { colors } = useTheme();
-  if (!onboarded) return <Redirect href="/onboarding" />;
+  if (!onboarded) return <Redirect href="/landing" />;
 
   return (
     // Scenes keep an opaque base so inactive tabs never bleed through; each tab
