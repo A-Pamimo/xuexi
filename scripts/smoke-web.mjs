@@ -55,9 +55,13 @@ page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
 
 const t0 = Date.now();
 await page.goto(url, { waitUntil: 'load' });
-// Onboarding should render the welcome copy quickly.
-await page.getByText('Welcome to xuexi').waitFor({ timeout: 8000 });
+// A brand-new visitor lands on the marketing page first.
+await page.getByText('Get started').waitFor({ timeout: 8000 });
 const tReady = Date.now() - t0;
+
+// Enter as a guest -> onboarding welcome.
+await page.getByText('Get started').click();
+await page.getByText('Welcome to xuexi').waitFor({ timeout: 4000 });
 
 // Drive onboarding -> first-word win -> tone primer -> finish -> lands in Tone
 // Dojo (a completable action).
@@ -88,7 +92,8 @@ await page
   .first()
   .waitFor({ timeout: 6000 });
 await tab('Stats').click();
-await page.getByText('Your progress').waitFor({ timeout: 5000 });
+// Exact match: the account card's "Save your progress" also contains this text.
+await page.getByText('Your progress', { exact: true }).waitFor({ timeout: 5000 });
 await tab('Feed').click();
 // Feed shows either sentences or the warm-up message.
 await page.waitForTimeout(800);

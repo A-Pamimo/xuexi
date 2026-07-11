@@ -7,7 +7,18 @@
  */
 import { create } from 'zustand';
 import { configureAnalytics, track } from '../lib/analytics';
-import { Store } from '../lib/db/store';
+import { emptyProgress, Store, type ProgressBlob } from '../lib/db/store';
+import {
+  initCloud,
+  isCloudConfigured,
+  pullProgress,
+  pushProgress,
+  signInWithGoogle,
+  signOutUser,
+  subscribeAuth,
+  type CloudUser,
+} from '../lib/cloud';
+import { mergeProgress, toCloudBlob } from '../lib/mergeProgress';
 import {
   advanceStreak,
   DAILY_GOAL_XP,
@@ -57,11 +68,20 @@ interface AppState {
   reminderPrefs: ReminderPrefs;
   store: Store | null;
 
+  // Account / cloud sync. `cloudConfigured` is false when no Firebase config is
+  // present (the app then runs purely as a local guest and hides sign-in).
+  user: CloudUser | null;
+  authReady: boolean;
+  cloudConfigured: boolean;
+  syncing: boolean;
+
   init(): Promise<void>;
   bump(): void;
   completeOnboarding(): void;
   setThemeMode(mode: ThemeMode): void;
   setShowPinyin(show: boolean): void;
+  signIn(): Promise<void>;
+  signOutAccount(): Promise<void>;
   goalToday(): { into: number; goal: number; ratio: number; met: boolean };
   setReminderPrefs(prefs: ReminderPrefs): void;
 
@@ -111,6 +131,11 @@ export const useApp = create<AppState>((set, get) => ({
   reminderPrefs: { enabled: false, hour: 19 },
   store: null,
 
+  user: null,
+  authReady: false,
+  cloudConfigured: isCloudConfigured(),
+  syncing: false,
+
   async init() {
     if (get().ready) return;
     try {
@@ -136,6 +161,14 @@ export const useApp = create<AppState>((set, get) => ({
       track('session_start');
       // Re-arm any stored daily reminder (no-op on web / when disabled).
       void scheduleReminders(store.getReminderPrefs());
+
+      // Cloud account: initialise auth and react to sign-in state. A returning
+      // signed-in session restores here (Firebase persists it); signing in later
+      // merges the local guest progress up. No-op / guest when unconfigured.
+      initCloud();
+      subscribeAuth((user) => {
+        void handleAuthChange(get, set, user);
+      });
     } catch (e) {
       // Seed/persistence load failed — surface an error instead of an infinite spinner.
       console.error('xuexi init failed:', e);
@@ -155,6 +188,16 @@ export const useApp = create<AppState>((set, get) => ({
   setShowPinyin(show: boolean) {
     get().store?.setShowPinyin(show);
     set({ showPinyin: show });
+  },
+
+  // Sign-in state changes flow through subscribeAuth -> handleAuthChange, which
+  // does the pull/merge/push. These just kick off the Firebase flow; errors
+  // (e.g. a closed popup) propagate to the caller to surface in the UI.
+  async signIn() {
+    await signInWithGoogle();
+  },
+  async signOutAccount() {
+    await signOutUser();
   },
 
   // Progress toward today's honest XP goal (see gamification.goalProgress). Reads
@@ -378,4 +421,83 @@ function applyXpAndStreak(
   stats = maybeStreak(store, stats, day);
   store.setStats(stats);
   set({ stats });
+}
+
+// --- cloud sync -------------------------------------------------------------
+
+// Push-on-change plumbing (module-scoped — not serialisable state). The store's
+// flush is the single choke point for every mutation; we debounce cloud writes
+// on top of it so a burst of reviews becomes one upload, not dozens.
+let unsubFlush: (() => void) | null = null;
+let pushTimer: ReturnType<typeof setTimeout> | null = null;
+
+function stopPushOnChange(): void {
+  if (unsubFlush) unsubFlush();
+  unsubFlush = null;
+  if (pushTimer) clearTimeout(pushTimer);
+  pushTimer = null;
+}
+
+function startPushOnChange(store: Store, uid: string): void {
+  stopPushOnChange();
+  unsubFlush = store.onFlush(() => {
+    if (pushTimer) clearTimeout(pushTimer);
+    pushTimer = setTimeout(() => {
+      void pushProgress(uid, toCloudBlob(store.snapshot())).catch((e) =>
+        console.warn('xuexi cloud push failed:', e),
+      );
+    }, 2500);
+  });
+}
+
+/** Pull the cloud copy, merge it loss-free with local, write the result both ways. */
+async function syncNow(
+  get: () => AppState,
+  set: (partial: Partial<AppState>) => void,
+  store: Store,
+  uid: string,
+): Promise<void> {
+  set({ syncing: true });
+  try {
+    const remote = await pullProgress(uid);
+    if (remote) {
+      const remoteFull: ProgressBlob = { ...emptyProgress(), ...remote };
+      store.replaceProgress(mergeProgress(store.snapshot(), remoteFull));
+    }
+    // Push the merged (or, for a first-time user, local-first) blob up.
+    await pushProgress(uid, toCloudBlob(store.snapshot()));
+    // Re-hydrate the reactive slices from the merged store so the UI updates.
+    set({
+      onboarded: store.isOnboarded(),
+      themeMode: store.getThemeMode(),
+      showPinyin: store.getShowPinyin(),
+      stats: store.getStats(),
+      dailyGoal: store.getDailyGoal(),
+      reminderPrefs: store.getReminderPrefs(),
+    });
+    void scheduleReminders(store.getReminderPrefs());
+    get().bump();
+    track('cloud_synced', { uid });
+  } catch (e) {
+    console.warn('xuexi cloud sync failed:', e);
+  } finally {
+    set({ syncing: false });
+  }
+}
+
+/** React to a Firebase auth-state change: sign-in merges + starts sync; sign-out stops it. */
+async function handleAuthChange(
+  get: () => AppState,
+  set: (partial: Partial<AppState>) => void,
+  user: CloudUser | null,
+): Promise<void> {
+  set({ user, authReady: true });
+  const store = get().store;
+  if (!store) return;
+  if (user) {
+    await syncNow(get, set, store, user.uid);
+    startPushOnChange(store, user.uid);
+  } else {
+    stopPushOnChange();
+  }
 }
