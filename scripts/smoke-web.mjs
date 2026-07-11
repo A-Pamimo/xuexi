@@ -92,7 +92,8 @@ await page
   .first()
   .waitFor({ timeout: 6000 });
 await tab('Stats').click();
-await page.getByText('Your progress').waitFor({ timeout: 5000 });
+// Exact match: the account card's "Save your progress" also contains this text.
+await page.getByText('Your progress', { exact: true }).waitFor({ timeout: 5000 });
 await tab('Feed').click();
 // Feed shows either sentences or the warm-up message.
 await page.waitForTimeout(800);
