@@ -51,6 +51,7 @@ interface AppState {
   rev: number;
   onboarded: boolean;
   themeMode: ThemeMode;
+  showPinyin: boolean;
   stats: UserStats;
   dailyGoal: number;
   reminderPrefs: ReminderPrefs;
@@ -60,6 +61,7 @@ interface AppState {
   bump(): void;
   completeOnboarding(): void;
   setThemeMode(mode: ThemeMode): void;
+  setShowPinyin(show: boolean): void;
   goalToday(): { into: number; goal: number; ratio: number; met: boolean };
   setReminderPrefs(prefs: ReminderPrefs): void;
 
@@ -94,6 +96,7 @@ export const useApp = create<AppState>((set, get) => ({
   rev: 0,
   onboarded: false,
   themeMode: 'system',
+  showPinyin: true,
   stats: {
     streak: 0,
     lastStreakDate: null,
@@ -125,6 +128,7 @@ export const useApp = create<AppState>((set, get) => ({
         ready: true,
         onboarded: store.isOnboarded(),
         themeMode: store.getThemeMode(),
+        showPinyin: store.getShowPinyin(),
         stats: store.getStats(),
         dailyGoal: store.getDailyGoal(),
         reminderPrefs: store.getReminderPrefs(),
@@ -146,6 +150,11 @@ export const useApp = create<AppState>((set, get) => ({
   setThemeMode(mode: ThemeMode) {
     get().store?.setThemeMode(mode);
     set({ themeMode: mode });
+  },
+
+  setShowPinyin(show: boolean) {
+    get().store?.setShowPinyin(show);
+    set({ showPinyin: show });
   },
 
   // Progress toward today's honest XP goal (see gamification.goalProgress). Reads

@@ -4,8 +4,9 @@
  * Everything anchors dopamine to genuine progress (spec <ethics>).
  */
 import React, { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import Svg, { Rect } from 'react-native-svg';
+import { Clock } from 'lucide-react-native';
 import { Body, Caption, Card, Display, H1, H2, ProgressBar, Screen } from '../../components/ui';
 import { Hanzi, Pinyin } from '../../components/chinese';
 import { ThemeToggle } from '../../components/ThemeToggle';
@@ -15,7 +16,7 @@ import { useReducedMotion } from '../../lib/motion';
 import { isKnown } from '../../lib/srs';
 import { State } from 'ts-fsrs';
 import { useApp, today } from '../../stores/appStore';
-import { radius, spacing, font } from '../../theme';
+import { radius, spacing, font, fonts } from '../../theme';
 import type { ThemeColors } from '../../theme';
 import { useTheme } from '../../lib/appearance';
 
@@ -109,10 +110,17 @@ export function StatsScreen() {
   );
 }
 
+// The dark "Total Input" hero — input hours are the app's honest progress metric,
+// so they lead the screen on a calm ink-dark card (same in light & dark mode, like
+// the paper-ink prototype), with a milestone bar to the next 100 hours.
+const HERO_BG = '#2D2D26';
+const HERO_TEXT = '#F5F1E8';
+const HERO_DIM = '#B8B0A0';
+const HERO_ACCENT = '#C69A6A';
+
 function Odometer({ hours }: { hours: number }) {
   const target = Math.round(hours * 60); // minutes
   const reduce = useReducedMotion();
-  const { colors } = useTheme();
   // Reduced motion: skip the count-up, show the final value (no first-frame flash of 0).
   const [shown, setShown] = useState(() => (reduce ? target : 0));
   useEffect(() => {
@@ -132,16 +140,24 @@ function Odometer({ hours }: { hours: number }) {
     raf = requestAnimationFrame(step);
     return () => cancelAnimationFrame(raf);
   }, [target, reduce]);
-  const h = Math.floor(shown / 60);
-  const m = shown % 60;
+  const shownHours = shown / 60;
+  const milestone = Math.max(100, Math.ceil(shownHours / 100) * 100);
+  const ratio = Math.min(1, milestone ? shownHours / milestone : 0);
   return (
-    <Card style={styles.odometer}>
-      <Caption>total input time</Caption>
-      <Body style={[styles.odoNumber, { color: colors.primary }]}>
-        {h}h {m}m
-      </Body>
-      <Caption style={{ textAlign: 'center' }}>input hours are the real progress metric</Caption>
-    </Card>
+    <View style={styles.hero}>
+      <View style={styles.heroHead}>
+        <Clock size={18} color={HERO_DIM} strokeWidth={2} />
+        <Text style={styles.heroLabel}>TOTAL INPUT</Text>
+      </View>
+      <View style={styles.heroNumRow}>
+        <Text style={styles.heroNum}>{shownHours.toFixed(1)}</Text>
+        <Text style={styles.heroUnit}>hours</Text>
+      </View>
+      <View style={styles.heroTrack}>
+        <View style={[styles.heroFill, { width: `${ratio * 100}%` }]} />
+      </View>
+      <Text style={styles.heroNext}>Next milestone: {milestone}h · the real progress metric</Text>
+    </View>
   );
 }
 
@@ -266,13 +282,31 @@ function masteryColor(colors: ThemeColors, state: number, stability: number): st
 }
 
 const styles = StyleSheet.create({
-  odometer: {
+  hero: {
     marginTop: spacing(3),
-    alignItems: 'center',
-    paddingVertical: spacing(5),
-    gap: spacing(1),
+    backgroundColor: HERO_BG,
+    borderRadius: radius.xl,
+    padding: spacing(3),
   },
-  odoNumber: { fontSize: 64, fontWeight: '900', marginVertical: spacing(0.5) },
+  heroHead: { flexDirection: 'row', alignItems: 'center', gap: spacing(1), marginBottom: spacing(2) },
+  heroLabel: {
+    color: HERO_DIM,
+    fontFamily: fonts.sansBold,
+    fontSize: 12,
+    letterSpacing: 1.5,
+  },
+  heroNumRow: { flexDirection: 'row', alignItems: 'flex-end', gap: spacing(1) },
+  heroNum: { color: HERO_TEXT, fontFamily: fonts.displayBold, fontSize: 60, lineHeight: 62 },
+  heroUnit: { color: HERO_DIM, fontFamily: fonts.sans, fontSize: 16, paddingBottom: spacing(1) },
+  heroTrack: {
+    height: 8,
+    borderRadius: radius.pill,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    overflow: 'hidden',
+    marginTop: spacing(2.5),
+  },
+  heroFill: { height: 8, borderRadius: radius.pill, backgroundColor: HERO_ACCENT },
+  heroNext: { color: HERO_DIM, fontFamily: fonts.sans, fontSize: 12, marginTop: spacing(1), textAlign: 'right' },
   featured: { marginTop: spacing(2), alignItems: 'center', gap: spacing(1), paddingVertical: spacing(3) },
   rowStats: { flexDirection: 'row', gap: spacing(1), marginTop: spacing(3) },
   stat: { flex: 1, alignItems: 'center', paddingVertical: spacing(2) },

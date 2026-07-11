@@ -17,17 +17,19 @@ import type { Store } from '../../lib/db/store';
 import * as juice from '../../lib/juice';
 import type { Rating, Sentence, Word } from '../../lib/types';
 import { useApp, type QueueItem } from '../../stores/appStore';
-import { font, radius, spacing } from '../../theme';
+import { font, fonts, HIT, radius, spacing } from '../../theme';
 import { useTheme } from '../../lib/appearance';
 import { knownRatio } from '../feed/selection';
 import { playWord } from '../shared/play';
 import { BuildExercise } from './BuildExercise';
 
-const RATINGS: { rating: Rating; label: string; variant: 'bad' | 'ghost' | 'good' }[] = [
-  { rating: 'again', label: 'Again', variant: 'bad' },
-  { rating: 'hard', label: 'Hard', variant: 'ghost' },
-  { rating: 'good', label: 'Good', variant: 'good' },
-  { rating: 'easy', label: 'Easy', variant: 'good' },
+// Rating → tone color, echoing the paper-ink prototype: Again→tone4 (falling/red),
+// Hard→tone3 (dip/orange), Good→tone2 (rising/green), Easy→tone1 (flat/blue).
+const RATINGS: { rating: Rating; label: string; tone: number }[] = [
+  { rating: 'again', label: 'Again', tone: 4 },
+  { rating: 'hard', label: 'Hard', tone: 3 },
+  { rating: 'good', label: 'Good', tone: 2 },
+  { rating: 'easy', label: 'Easy', tone: 1 },
 ];
 
 // A card is "mature" enough to earn a production exercise once it's a settled
@@ -299,13 +301,7 @@ export function ReviewScreen() {
       ) : revealed ? (
         <View style={styles.ratings}>
           {RATINGS.map((r) => (
-            <Button
-              key={r.rating}
-              label={r.label}
-              variant={r.variant}
-              onPress={() => rate(r.rating)}
-              style={{ flex: 1, marginHorizontal: spacing(0.5) }}
-            />
+            <RatingButton key={r.rating} label={r.label} tone={r.tone} onPress={() => rate(r.rating)} />
           ))}
         </View>
       ) : (
@@ -333,6 +329,25 @@ function Breakdown({ word }: { word: Word }) {
   );
 }
 
+/** A tone-tinted recall-grade button: soft tone fill, tone border, tone label. */
+function RatingButton({ label, tone, onPress }: { label: string; tone: number; onPress: () => void }) {
+  const { toneColor } = useTheme();
+  const c = toneColor(tone);
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.rating,
+        { backgroundColor: `${c}22`, borderColor: `${c}66`, transform: [{ scale: pressed ? 0.96 : 1 }] },
+      ]}
+    >
+      <Body style={{ color: c, fontWeight: '800', fontFamily: fonts.sansBold }}>{label}</Body>
+    </Pressable>
+  );
+}
+
 function ComboMeter({ combo }: { combo: number }) {
   const { colors, readableOn } = useTheme();
   if (combo < 2) return <Caption>no combo yet</Caption>;
@@ -353,7 +368,16 @@ const styles = StyleSheet.create({
   headerStatus: { flex: 1, alignItems: 'flex-start' },
   prompt: { alignItems: 'center', paddingVertical: spacing(3.5), marginTop: spacing(2) },
   answer: { alignItems: 'center', marginTop: spacing(3) },
-  ratings: { flexDirection: 'row', marginBottom: spacing(1) },
+  ratings: { flexDirection: 'row', marginBottom: spacing(1), gap: spacing(1) },
+  rating: {
+    flex: 1,
+    minHeight: HIT,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing(1.75),
+  },
   combo: {
     paddingHorizontal: spacing(1.5),
     paddingVertical: spacing(0.5),
