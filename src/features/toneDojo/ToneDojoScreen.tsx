@@ -170,7 +170,7 @@ export function ToneDojoScreen() {
           Hear a syllable, tap its tone before the bar empties. Many speakers,
           fast rounds. 60 seconds — go!
         </Body>
-        <Button label="Start" onPress={start} style={{ alignSelf: 'stretch' }} />
+        <Button label="Start" variant="seal" onPress={start} style={{ alignSelf: 'stretch' }} />
       </Screen>
     );
   }
@@ -187,7 +187,7 @@ export function ToneDojoScreen() {
         </Body>
         <Caption style={{ marginTop: spacing(1) }}>All-time accuracy: {allTime}%</Caption>
         <ToneBreakdown />
-        <Button label="Go again" onPress={start} style={{ marginTop: spacing(3), alignSelf: 'stretch' }} />
+        <Button label="Go again" variant="seal" onPress={start} style={{ marginTop: spacing(3), alignSelf: 'stretch' }} />
       </Screen>
     );
   }

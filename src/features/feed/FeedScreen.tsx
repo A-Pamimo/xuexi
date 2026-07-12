@@ -19,6 +19,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Settings2 } from 'lucide-react-native';
 import { Body, Button, Caption, H1, Pill, PlayButton, Screen } from '../../components/ui';
 import { Hanzi, Pinyin } from '../../components/chinese';
+import { StampIcon } from '../../components/StampIcon';
 import { Ticker } from '../../components/Ticker';
 import { DailyGoalRing } from '../../components/DailyGoalRing';
 import { SettingsSheet } from '../../components/SettingsSheet';
@@ -246,9 +247,8 @@ export function FeedScreen() {
           accessibilityLabel="Settings"
           hitSlop={8}
           onPress={() => { juice.tap(); setSettingsOpen(true); }}
-          style={styles.gear}
         >
-          <Settings2 size={20} color={colors.textDim} strokeWidth={2} />
+          <StampIcon icon={Settings2} size={16} color={colors.textDim} />
         </Pressable>
         <Pressable
           accessibilityRole="switch"

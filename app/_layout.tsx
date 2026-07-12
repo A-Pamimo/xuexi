@@ -11,14 +11,13 @@ import { Inter_500Medium } from '@expo-google-fonts/inter/500Medium';
 import { Inter_600SemiBold } from '@expo-google-fonts/inter/600SemiBold';
 import { Inter_700Bold } from '@expo-google-fonts/inter/700Bold';
 import { Inter_800ExtraBold } from '@expo-google-fonts/inter/800ExtraBold';
-import { SpaceGrotesk_500Medium } from '@expo-google-fonts/space-grotesk/500Medium';
-import { SpaceGrotesk_600SemiBold } from '@expo-google-fonts/space-grotesk/600SemiBold';
-import { SpaceGrotesk_700Bold } from '@expo-google-fonts/space-grotesk/700Bold';
 import { NotoSerifSC_500Medium } from '@expo-google-fonts/noto-serif-sc/500Medium';
+import { MaShanZheng_400Regular } from '@expo-google-fonts/ma-shan-zheng/400Regular';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Body, Loading, Screen } from '../src/components/ui';
 import { BootScreen } from '../src/components/BootScreen';
+import { BrushFilter, PAPER_TEXTURE_URI } from '../src/components/StampIcon';
 import { useApp } from '../src/stores/appStore';
 import { useWebFocusRing } from '../src/lib/motion';
 import { useTheme } from '../src/lib/appearance';
@@ -30,22 +29,21 @@ export default function RootLayout() {
   const [booting, setBooting] = React.useState(true);
   const { colors, scheme } = useTheme();
 
-  // The literary type system (Inter / Space Grotesk / Noto Serif SC). We gate the
-  // app render on this so first paint isn't a flash of the system font; the
-  // BootScreen covers the load. On a font error we proceed anyway (system
-  // fallback) rather than trap the user behind a spinner.
-  const [fontsLoaded, fontError] = useFonts({
+  // Gate first paint ONLY on the small Inter UI set (~1 MB) so the app boots fast.
+  // The big CJK families (Noto Serif SC ~15 MB, Ma Shan Zheng ~5.9 MB) would add
+  // ~20 s to a cold WEB load if gated, so they stream in the background instead:
+  // hanzi/wordmarks render in the system CJK fallback for a beat, then swap in
+  // when ready. On native the fonts are bundled, so there's no swap either way.
+  const [uiFontsLoaded, uiFontError] = useFonts({
     Inter_400Regular,
     Inter_500Medium,
     Inter_600SemiBold,
     Inter_700Bold,
     Inter_800ExtraBold,
-    SpaceGrotesk_500Medium,
-    SpaceGrotesk_600SemiBold,
-    SpaceGrotesk_700Bold,
-    NotoSerifSC_500Medium,
   });
-  const fontsReady = fontsLoaded || !!fontError;
+  // Fire-and-forget the heavy display fonts (not part of the boot gate).
+  useFonts({ NotoSerifSC_500Medium, MaShanZheng_400Regular });
+  const fontsReady = uiFontsLoaded || !!uiFontError;
 
   useWebFocusRing(); // web-only keyboard :focus-visible ring (no-op on native)
 
@@ -57,8 +55,13 @@ export default function RootLayout() {
     const root = document.documentElement;
     root.style.setProperty('--xuexi-focus', colors.primary);
     root.style.backgroundColor = colors.bg;
-    if (document.body) document.body.style.backgroundColor = colors.bg;
-  }, [colors.primary, colors.bg]);
+    if (document.body) {
+      document.body.style.backgroundColor = colors.bg;
+      // Subtle rice-paper grain over the base color (imperial texture). The noise
+      // is a tiny inline SVG data-URI; opacity differs by mode. No-op on native.
+      document.body.style.backgroundImage = PAPER_TEXTURE_URI(scheme === 'dark');
+    }
+  }, [colors.primary, colors.bg, scheme]);
 
   useEffect(() => {
     void init();
@@ -72,6 +75,7 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: colors.bg }}>
       <SafeAreaProvider>
         <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
+        <BrushFilter />
         {ready && fontsReady ? (
           <Stack
             screenOptions={{

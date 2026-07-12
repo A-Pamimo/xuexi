@@ -101,12 +101,42 @@ export function Button({
 }: {
   label: string;
   onPress: () => void;
-  variant?: 'primary' | 'ghost' | 'good' | 'bad';
+  variant?: 'primary' | 'ghost' | 'good' | 'bad' | 'seal';
   disabled?: boolean;
   style?: ViewStyle;
   accessibilityLabel?: string;
 }) {
   const { colors, readableOn } = useTheme();
+
+  // Seal: the imperial CTA — a bordered cinnabar "stamp". Transparent with a
+  // thick primary border + tracked uppercase serif label; fills on press.
+  if (variant === 'seal') {
+    return (
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={accessibilityLabel ?? label}
+        accessibilityState={{ disabled: !!disabled }}
+        disabled={disabled}
+        onPress={onPress}
+        style={({ pressed }) => [
+          styles.seal,
+          {
+            borderColor: colors.primary,
+            backgroundColor: pressed ? colors.primary : 'transparent',
+            opacity: disabled ? 0.4 : 1,
+          },
+          style,
+        ]}
+      >
+        {({ pressed }) => (
+          <Text style={[styles.sealLabel, { color: pressed ? colors.onPrimary : colors.primary }]}>
+            {label.toUpperCase()}
+          </Text>
+        )}
+      </Pressable>
+    );
+  }
+
   const fill =
     variant === 'primary'
       ? colors.primary
@@ -300,6 +330,21 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   btnLabel: { fontSize: font.body, fontWeight: '800', fontFamily: fonts.sansBold },
+  seal: {
+    minHeight: HIT,
+    paddingVertical: spacing(1.5),
+    paddingHorizontal: spacing(3),
+    borderRadius: radius.sm,
+    borderWidth: 2.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sealLabel: {
+    fontSize: font.body,
+    fontFamily: fonts.serif,
+    letterSpacing: 3,
+    textAlign: 'center',
+  },
   track: { borderRadius: radius.pill, overflow: 'hidden', width: '100%' },
   play: { alignItems: 'center', justifyContent: 'center' },
   playCircle: { alignItems: 'center', justifyContent: 'center', borderWidth: 2 },

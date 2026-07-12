@@ -305,7 +305,7 @@ export function ReviewScreen() {
           ))}
         </View>
       ) : (
-        <Button label="Show answer" onPress={() => setRevealed(true)} />
+        <Button label="Show answer" variant="seal" onPress={() => setRevealed(true)} />
       )}
     </Screen>
   );

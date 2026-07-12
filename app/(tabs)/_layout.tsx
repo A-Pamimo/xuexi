@@ -1,11 +1,40 @@
 import { Redirect, Tabs } from 'expo-router';
 import React from 'react';
-import { BarChart2, BookOpen, Layers, Mic2 } from 'lucide-react-native';
+import { Text, View } from 'react-native';
 import { fonts } from '../../src/theme';
 import { useApp } from '../../src/stores/appStore';
 import { unlockAudio } from '../../src/lib/audio';
 import * as juice from '../../src/lib/juice';
 import { useTheme } from '../../src/lib/appearance';
+
+/** A tab glyph (single hanzi) with a small cinnabar diamond under the active one. */
+function TabIcon({ glyph, color, focused }: { glyph: string; color: string; focused: boolean }) {
+  const { colors } = useTheme();
+  return (
+    <View style={{ alignItems: 'center', justifyContent: 'center' }}>
+      <Text style={{ fontSize: 22, lineHeight: 26, color, fontFamily: fonts.serif }}>{glyph}</Text>
+      <View style={{ height: 8, alignItems: 'center', justifyContent: 'center' }}>
+        {focused ? (
+          <View
+            style={{
+              width: 6,
+              height: 6,
+              backgroundColor: colors.primary,
+              transform: [{ rotate: '45deg' }],
+            }}
+          />
+        ) : null}
+      </View>
+    </View>
+  );
+}
+
+const TABS: { name: string; title: string; glyph: string }[] = [
+  { name: 'index', title: 'Feed', glyph: '流' },
+  { name: 'reviews', title: 'Learn', glyph: '学' },
+  { name: 'dojo', title: 'Dojo', glyph: '练' },
+  { name: 'stats', title: 'Stats', glyph: '绩' },
+];
 
 export default function TabsLayout() {
   const onboarded = useApp((s) => s.onboarded);
@@ -13,9 +42,6 @@ export default function TabsLayout() {
   if (!onboarded) return <Redirect href="/landing" />;
 
   return (
-    // Scenes keep an opaque base so inactive tabs never bleed through; each tab
-    // screen renders its own ambient backdrop (behind content, in front of this
-    // base). Cards / the tab bar stay opaque for text legibility.
     <Tabs
       screenListeners={{
         // The tab press is exactly the gesture browsers require to unlock audio,
@@ -30,49 +56,34 @@ export default function TabsLayout() {
         sceneStyle: { backgroundColor: colors.bg },
         tabBarStyle: {
           backgroundColor: colors.bgElevated,
-          borderTopColor: colors.border,
-          height: 68,
+          borderTopColor: colors.borderStrong,
+          borderTopWidth: 2,
+          height: 76,
           paddingBottom: 10,
           paddingTop: 8,
         },
         tabBarLabelStyle: {
           fontSize: 10,
-          fontFamily: fonts.sansBold,
-          letterSpacing: 0.6,
+          fontFamily: fonts.serif,
+          letterSpacing: 1.5,
           textTransform: 'uppercase',
         },
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textDim,
       }}
     >
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: 'Feed',
-          tabBarIcon: ({ color }) => <Layers size={22} color={color} strokeWidth={2} />,
-        }}
-      />
-      <Tabs.Screen
-        name="reviews"
-        options={{
-          title: 'Learn',
-          tabBarIcon: ({ color }) => <BookOpen size={22} color={color} strokeWidth={2} />,
-        }}
-      />
-      <Tabs.Screen
-        name="dojo"
-        options={{
-          title: 'Tone Dojo',
-          tabBarIcon: ({ color }) => <Mic2 size={22} color={color} strokeWidth={2} />,
-        }}
-      />
-      <Tabs.Screen
-        name="stats"
-        options={{
-          title: 'Stats',
-          tabBarIcon: ({ color }) => <BarChart2 size={22} color={color} strokeWidth={2} />,
-        }}
-      />
+      {TABS.map((t) => (
+        <Tabs.Screen
+          key={t.name}
+          name={t.name}
+          options={{
+            title: t.title,
+            tabBarIcon: ({ color, focused }) => (
+              <TabIcon glyph={t.glyph} color={color} focused={focused} />
+            ),
+          }}
+        />
+      ))}
     </Tabs>
   );
 }

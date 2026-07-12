@@ -7,6 +7,7 @@ import React, { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import Svg, { Rect } from 'react-native-svg';
 import { Clock } from 'lucide-react-native';
+import { StampIcon } from '../../components/StampIcon';
 import { Body, Caption, Card, Display, H1, H2, ProgressBar, Screen } from '../../components/ui';
 import { Hanzi, Pinyin } from '../../components/chinese';
 import { ThemeToggle } from '../../components/ThemeToggle';
@@ -120,12 +121,12 @@ export function StatsScreen() {
 }
 
 // The dark "Total Input" hero — input hours are the app's honest progress metric,
-// so they lead the screen on a calm ink-dark card (same in light & dark mode, like
-// the paper-ink prototype), with a milestone bar to the next 100 hours.
-const HERO_BG = '#2D2D26';
-const HERO_TEXT = '#F5F1E8';
+// so they lead the screen on a near-black ink card (same in light & dark mode),
+// with a cinnabar milestone bar to the next 100 hours.
+const HERO_BG = '#1A1A18';
+const HERO_TEXT = '#F4EEDF';
 const HERO_DIM = '#B8B0A0';
-const HERO_ACCENT = '#C69A6A';
+const HERO_ACCENT = '#E24A4A';
 
 function Odometer({ hours }: { hours: number }) {
   const target = Math.round(hours * 60); // minutes
@@ -155,7 +156,7 @@ function Odometer({ hours }: { hours: number }) {
   return (
     <View style={styles.hero}>
       <View style={styles.heroHead}>
-        <Clock size={18} color={HERO_DIM} strokeWidth={2} />
+        <StampIcon icon={Clock} size={14} color={HERO_DIM} box={26} />
         <Text style={styles.heroLabel}>TOTAL INPUT</Text>
       </View>
       <View style={styles.heroNumRow}>

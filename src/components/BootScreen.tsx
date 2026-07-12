@@ -11,7 +11,7 @@
  */
 import React, { useEffect, useRef } from 'react';
 import { Animated, Easing, Platform, StyleSheet, Text, View } from 'react-native';
-import { font, spacing, type } from '../theme';
+import { font, fonts, spacing, type } from '../theme';
 import { BOOT_MS, EXIT_MS, useReducedMotion } from '../lib/motion';
 import { useTheme } from '../lib/appearance';
 
@@ -54,7 +54,7 @@ export function BootScreen({ settled, onFinish }: { settled: boolean; onFinish: 
     >
       <View style={styles.stack}>
         {['学', '习'].map((c) => (
-          <Text key={c} style={[styles.glyph, { color: colors.text }]}>
+          <Text key={c} style={[styles.glyph, { color: colors.primary }]}>
             {c}
           </Text>
         ))}
@@ -75,8 +75,8 @@ const styles = StyleSheet.create({
   stack: { alignItems: 'center' },
   glyph: {
     fontSize: font.hanziXL,
-    lineHeight: Math.round(font.hanziXL * 0.98),
-    fontWeight: '900',
+    lineHeight: Math.round(font.hanziXL * 1.05),
+    fontFamily: fonts.calligraphy,
   },
   ready: { ...type.display, letterSpacing: 2, marginTop: spacing(3) },
   startText: { ...type.h1, letterSpacing: 4, marginTop: spacing(1) },

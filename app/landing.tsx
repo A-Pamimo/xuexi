@@ -7,18 +7,19 @@
 import { useRouter } from 'expo-router';
 import React, { useEffect } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
-import { Layers, Mic2, Sparkles } from 'lucide-react-native';
+import { Layers, Mic2, Sparkles, type LucideIcon } from 'lucide-react-native';
 import { Body, Button, Caption, H2, Screen } from '../src/components/ui';
-import { Hanzi } from '../src/components/chinese';
+import { Wordmark } from '../src/components/chinese';
+import { StampIcon } from '../src/components/StampIcon';
 import { GoogleButton } from '../src/components/GoogleButton';
 import { useApp } from '../src/stores/appStore';
 import { useTheme } from '../src/lib/appearance';
 import { fonts, radius, spacing } from '../src/theme';
 
-const FEATURES: { icon: React.ReactNode; title: string; body: string }[] = [
-  { icon: <Layers size={20} />, title: 'A calm feed', body: 'Swipeable sentences you can already almost read — comprehensible input, no doomscroll.' },
-  { icon: <Mic2 size={20} />, title: 'Train your ear', body: 'Fast tone-dojo rounds with many voices — the proven way to make tones stick.' },
-  { icon: <Sparkles size={20} />, title: 'Honest progress', body: 'Real spaced repetition, streaks and input-hours — dopamine pointed at actual fluency.' },
+const FEATURES: { icon: LucideIcon; title: string; body: string }[] = [
+  { icon: Layers, title: 'A calm feed', body: 'Swipeable sentences you can already almost read — comprehensible input, no doomscroll.' },
+  { icon: Mic2, title: 'Train your ear', body: 'Fast tone-dojo rounds with many voices — the proven way to make tones stick.' },
+  { icon: Sparkles, title: 'Honest progress', body: 'Real spaced repetition, streaks and input-hours — dopamine pointed at actual fluency.' },
 ];
 
 export default function Landing() {
@@ -46,7 +47,7 @@ export default function Landing() {
         contentContainerStyle={styles.content}
       >
         <View style={styles.hero}>
-          <Hanzi text="学习" size={72} />
+          <Wordmark text="学习" size={88} color={colors.primary} />
           <Caption style={{ letterSpacing: 4, marginTop: spacing(1) }}>XUÉ XÍ</Caption>
           <Body style={styles.tagline}>
             A calm, literary way to actually learn Mandarin — built from the habits that already
@@ -56,12 +57,8 @@ export default function Landing() {
 
         <View style={styles.features}>
           {FEATURES.map((f) => (
-            <View key={f.title} style={[styles.feature, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-              <View style={[styles.featureIcon, { backgroundColor: colors.primarySoft }]}>
-                {React.isValidElement(f.icon)
-                  ? React.cloneElement(f.icon as React.ReactElement<{ color?: string }>, { color: colors.primary })
-                  : f.icon}
-              </View>
+            <View key={f.title} style={[styles.feature, { backgroundColor: colors.surface, borderColor: colors.borderStrong }]}>
+              <StampIcon icon={f.icon} size={20} />
               <View style={{ flex: 1 }}>
                 <H2 style={{ fontSize: 17 }}>{f.title}</H2>
                 <Caption style={{ marginTop: 2 }}>{f.body}</Caption>
@@ -71,7 +68,7 @@ export default function Landing() {
         </View>
 
         <View style={styles.cta}>
-          <Button label="Get started" onPress={() => router.push('/onboarding')} style={{ alignSelf: 'stretch' }} />
+          <Button label="Get started" variant="seal" onPress={() => router.push('/onboarding')} style={{ alignSelf: 'stretch' }} />
           <GoogleButton style={{ alignSelf: 'stretch', marginTop: spacing(1.5) }} />
           <Caption style={{ textAlign: 'center', marginTop: spacing(2) }}>
             No account needed — sign in only to save & sync across devices.

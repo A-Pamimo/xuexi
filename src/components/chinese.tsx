@@ -6,6 +6,19 @@ import { useScramble } from './ScrambleText';
 import { useTheme } from '../lib/appearance';
 import { fonts } from '../theme';
 
+/**
+ * Decorative hanzi WORDMARK in brush calligraphy (Ma Shan Zheng). For branding
+ * only (the 学习 logo) — never content hanzi, which stay legible in the serif.
+ */
+export function Wordmark({ text, size = 72, color }: { text: string; size?: number; color?: string }) {
+  const { colors } = useTheme();
+  return (
+    <Text style={{ color: color ?? colors.text, fontSize: size, fontFamily: fonts.calligraphy, lineHeight: size * 1.1 }}>
+      {text}
+    </Text>
+  );
+}
+
 export function Hanzi({
   text,
   size = 48,
