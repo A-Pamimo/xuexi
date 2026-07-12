@@ -295,7 +295,7 @@ const styles = StyleSheet.create({
   hero: {
     marginTop: spacing(3),
     backgroundColor: HERO_BG,
-    borderRadius: radius.xl,
+    borderRadius: radius.md, // carved-seal corners, not a rounded app card
     padding: spacing(3),
   },
   heroHead: { flexDirection: 'row', alignItems: 'center', gap: spacing(1), marginBottom: spacing(2) },
@@ -308,14 +308,18 @@ const styles = StyleSheet.create({
   heroNumRow: { flexDirection: 'row', alignItems: 'flex-end', gap: spacing(1) },
   heroNum: { color: HERO_TEXT, fontFamily: fonts.displayBold, fontSize: 60, lineHeight: 62 },
   heroUnit: { color: HERO_DIM, fontFamily: fonts.sans, fontSize: 16, paddingBottom: spacing(1) },
+  // Square-ruled milestone bar (a bordered channel with a hairline paper gap),
+  // echoing the double rule of the seal buttons.
   heroTrack: {
-    height: 8,
-    borderRadius: radius.pill,
-    backgroundColor: 'rgba(255,255,255,0.12)',
+    height: 12,
+    borderRadius: 1,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.25)',
+    padding: 2,
     overflow: 'hidden',
     marginTop: spacing(2.5),
   },
-  heroFill: { height: 8, borderRadius: radius.pill, backgroundColor: HERO_ACCENT },
+  heroFill: { height: '100%', backgroundColor: HERO_ACCENT },
   heroNext: { color: HERO_DIM, fontFamily: fonts.sans, fontSize: 12, marginTop: spacing(1), textAlign: 'right' },
   featured: { marginTop: spacing(2), alignItems: 'center', gap: spacing(1), paddingVertical: spacing(3) },
   rowStats: { flexDirection: 'row', gap: spacing(1), marginTop: spacing(3) },

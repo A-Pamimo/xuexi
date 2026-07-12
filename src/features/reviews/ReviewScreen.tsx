@@ -8,7 +8,9 @@
 import { useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
-import { Body, Button, Caption, Card, H1, Label, PlayButton, ProgressBar, Screen } from '../../components/ui';
+import { Check } from 'lucide-react-native';
+import { Body, Button, Caption, Card, H1, Label, PlaqueButton, PlayButton, ProgressBar, Screen } from '../../components/ui';
+import { DiamondSeal } from '../../components/DiamondSeal';
 import { Hanzi, Pinyin } from '../../components/chinese';
 import { DailyGoalRing } from '../../components/DailyGoalRing';
 import { Ticker } from '../../components/Ticker';
@@ -17,7 +19,7 @@ import type { Store } from '../../lib/db/store';
 import * as juice from '../../lib/juice';
 import type { Rating, Sentence, Word } from '../../lib/types';
 import { useApp, type QueueItem } from '../../stores/appStore';
-import { font, fonts, HIT, radius, spacing } from '../../theme';
+import { font, radius, spacing } from '../../theme';
 import { useTheme } from '../../lib/appearance';
 import { knownRatio } from '../feed/selection';
 import { playWord } from '../shared/play';
@@ -123,9 +125,12 @@ export function ReviewScreen() {
     const known = knownWordIds().size;
     return (
       <Screen center ambient>
-        <Body style={{ fontSize: 48 }}>🎉</Body>
-        <H1>Session complete</H1>
+        <DiamondSeal icon={Check} size={84} />
+        <H1 style={{ marginTop: spacing(1) }}>Session complete</H1>
         <Body dim style={{ marginTop: spacing(1), textAlign: 'center' }}>
+          The ink is dry — every mark stays.
+        </Body>
+        <Body dim style={{ marginTop: spacing(0.5), textAlign: 'center' }}>
           Learned {learned} new · reviewed {reviewed} · +{gainedXp} XP
         </Body>
         <Caption style={{ marginTop: spacing(1), textAlign: 'center' }}>
@@ -329,23 +334,10 @@ function Breakdown({ word }: { word: Word }) {
   );
 }
 
-/** A tone-tinted recall-grade button: soft tone fill, tone border, tone label. */
+/** A recall-grade plaque: engraved box with tone-colored brackets + label. */
 function RatingButton({ label, tone, onPress }: { label: string; tone: number; onPress: () => void }) {
   const { toneColor } = useTheme();
-  const c = toneColor(tone);
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.rating,
-        { backgroundColor: `${c}22`, borderColor: `${c}66`, transform: [{ scale: pressed ? 0.96 : 1 }] },
-      ]}
-    >
-      <Body style={{ color: c, fontWeight: '800', fontFamily: fonts.sansBold }}>{label}</Body>
-    </Pressable>
-  );
+  return <PlaqueButton label={label} color={toneColor(tone)} onPress={onPress} style={styles.rating} />;
 }
 
 function ComboMeter({ combo }: { combo: number }) {
@@ -368,16 +360,8 @@ const styles = StyleSheet.create({
   headerStatus: { flex: 1, alignItems: 'flex-start' },
   prompt: { alignItems: 'center', paddingVertical: spacing(3.5), marginTop: spacing(2) },
   answer: { alignItems: 'center', marginTop: spacing(3) },
-  ratings: { flexDirection: 'row', marginBottom: spacing(1), gap: spacing(1) },
-  rating: {
-    flex: 1,
-    minHeight: HIT,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: spacing(1.75),
-  },
+  ratings: { flexDirection: 'row', marginBottom: spacing(1), gap: spacing(1.25) },
+  rating: { flex: 1 },
   combo: {
     paddingHorizontal: spacing(1.5),
     paddingVertical: spacing(0.5),

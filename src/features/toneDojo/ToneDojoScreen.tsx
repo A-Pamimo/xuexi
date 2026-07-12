@@ -7,7 +7,9 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useFocusEffect } from 'expo-router';
 import { Pressable, StyleSheet, View } from 'react-native';
-import { Body, Button, Caption, Display, H1, PlayButton, ProgressBar, Screen } from '../../components/ui';
+import { Award, Volume2 } from 'lucide-react-native';
+import { Body, Button, Caption, H1, PlaqueCorners, PlayButton, ProgressBar, Screen } from '../../components/ui';
+import { DiamondSeal } from '../../components/DiamondSeal';
 import { ScrambleText } from '../../components/ScrambleText';
 import { Ticker } from '../../components/Ticker';
 import { playAsset, stopAudio } from '../../lib/audio';
@@ -164,8 +166,8 @@ export function ToneDojoScreen() {
   if (phase === 'idle') {
     return (
       <Screen center ambient>
-        <Display>🥋</Display>
-        <H1>Tone Dojo</H1>
+        <DiamondSeal icon={Volume2} size={84} color={colors.textDim} />
+        <H1 style={{ marginTop: spacing(1) }}>Tone Dojo</H1>
         <Body dim style={{ textAlign: 'center', marginVertical: spacing(2), maxWidth: 320 }}>
           Hear a syllable, tap its tone before the bar empties. Many speakers,
           fast rounds. 60 seconds — go!
@@ -180,8 +182,8 @@ export function ToneDojoScreen() {
     const allTime = allTimeAccuracy(store);
     return (
       <Screen center ambient>
-        <Display>{acc >= 80 ? '🎉' : '💪'}</Display>
-        <H1>Time!</H1>
+        <DiamondSeal icon={Award} size={84} color={acc >= 80 ? colors.accent : colors.primary} />
+        <H1 style={{ marginTop: spacing(1) }}>Time!</H1>
         <Body style={{ marginTop: spacing(1), textAlign: 'center' }}>
           {score.correct}/{score.total} correct · {acc}% · best combo {maxCombo}
         </Body>
@@ -262,8 +264,12 @@ export function ToneDojoScreen() {
             accessibilityLabel={`Tone ${t}, ${TONE_NAMES[t - 1]}`}
             disabled={!!feedback}
             onPress={() => answer(t)}
-            style={[styles.toneBtn, { borderColor: toneColor(t) }]}
+            style={({ pressed }) => [
+              styles.toneBtn,
+              { borderColor: toneColor(t), transform: [{ scale: pressed ? 0.97 : 1 }] },
+            ]}
           >
+            <PlaqueCorners color={toneColor(t)} />
             <ToneContour tone={t} size={70} />
             <Body style={{ color: toneColor(t), fontWeight: '800', fontSize: 15 }}>{TONE_LABELS[t - 1]}</Body>
           </Pressable>
@@ -313,10 +319,14 @@ const makeStyles = (c: ThemeColors) =>
     breakdown: { marginTop: spacing(2), alignSelf: 'stretch', gap: spacing(0.75) },
     breakdownRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
     tones: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
+    // Engraved plaque: strong top/bottom rules, hairline sides, sharp corners.
     toneBtn: {
       width: '48%',
-      borderWidth: 2,
-      borderRadius: radius.md,
+      borderTopWidth: 2,
+      borderBottomWidth: 2,
+      borderLeftWidth: 1,
+      borderRightWidth: 1,
+      borderRadius: radius.sm,
       alignItems: 'center',
       paddingVertical: spacing(1.5),
       marginBottom: spacing(1.5),

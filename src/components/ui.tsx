@@ -17,7 +17,9 @@ import {
 // react-native-web's Animated ignores the native driver (and can warn); keep it
 // off on web, on everywhere else.
 const NATIVE_DRIVER = Platform.OS !== 'web';
+const IS_WEB = Platform.OS === 'web';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Volume2, VolumeX } from 'lucide-react-native';
 import { elevation, font, fonts, HIT, radius, spacing, type } from '../theme';
 import type { ThemeColors } from '../theme';
 import { useReducedMotion } from '../lib/motion';
@@ -108,8 +110,10 @@ export function Button({
 }) {
   const { colors, readableOn } = useTheme();
 
-  // Seal: the imperial CTA — a bordered cinnabar "stamp". Transparent with a
-  // thick primary border + tracked uppercase serif label; fills on press.
+  // Seal: the imperial CTA — a cinnabar "stamp" with the classic DOUBLE rule of
+  // a carved seal (thick outer border, paper gap, thin inner line) + tracked
+  // uppercase serif label. Pressing fills it like fresh seal paste, flipping the
+  // inner line and label to paper ink.
   if (variant === 'seal') {
     return (
       <Pressable
@@ -129,9 +133,13 @@ export function Button({
         ]}
       >
         {({ pressed }) => (
-          <Text style={[styles.sealLabel, { color: pressed ? colors.onPrimary : colors.primary }]}>
-            {label.toUpperCase()}
-          </Text>
+          <View
+            style={[styles.sealInner, { borderColor: pressed ? colors.onPrimary : colors.primary }]}
+          >
+            <Text style={[styles.sealLabel, { color: pressed ? colors.onPrimary : colors.primary }]}>
+              {label.toUpperCase()}
+            </Text>
+          </View>
         )}
       </Pressable>
     );
@@ -163,6 +171,97 @@ export function Button({
       ]}
     >
       <Text style={[styles.btnLabel, { color: ink }]}>{label}</Text>
+    </Pressable>
+  );
+}
+
+// ---- Plaque: engraved-plaque button chrome ----------------------------------
+/**
+ * The accent corners of an engraved plaque — two small right-angle brackets
+ * (top-left, bottom-right) laid over a bordered box. Drop inside any relatively
+ * positioned container to give it the plaque treatment.
+ */
+export function PlaqueCorners({ color, size = 12, thickness = 2 }: {
+  color: string;
+  size?: number;
+  thickness?: number;
+}) {
+  return (
+    <>
+      <View
+        pointerEvents="none"
+        style={{
+          position: 'absolute',
+          top: -thickness,
+          left: -thickness,
+          width: size,
+          height: size,
+          borderTopWidth: thickness,
+          borderLeftWidth: thickness,
+          borderColor: color,
+        }}
+      />
+      <View
+        pointerEvents="none"
+        style={{
+          position: 'absolute',
+          bottom: -thickness,
+          right: -thickness,
+          width: size,
+          height: size,
+          borderBottomWidth: thickness,
+          borderRightWidth: thickness,
+          borderColor: color,
+        }}
+      />
+    </>
+  );
+}
+
+/**
+ * An engraved-plaque button: strong top/bottom rules, hairline sides, sharp
+ * corners, and accent brackets in `color` (the grade / tone color). Transparent
+ * until pressed, when it takes a faint wash of its accent. The imperial
+ * counterpart of a "choice" button (grades, tone answers).
+ */
+export function PlaqueButton({
+  label,
+  color,
+  onPress,
+  disabled,
+  style,
+  accessibilityLabel,
+}: {
+  label: string;
+  /** Accent color for brackets + label; defaults to the cinnabar primary. */
+  color?: string;
+  onPress: () => void;
+  disabled?: boolean;
+  style?: ViewStyle;
+  accessibilityLabel?: string;
+}) {
+  const { colors } = useTheme();
+  const c = color ?? colors.primary;
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel ?? label}
+      accessibilityState={{ disabled: !!disabled }}
+      disabled={disabled}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.plaque,
+        {
+          borderColor: colors.borderStrong,
+          backgroundColor: pressed ? `${c}1A` : 'transparent',
+          transform: [{ scale: pressed ? 0.97 : 1 }],
+          opacity: disabled ? 0.4 : 1,
+        },
+        style,
+      ]}
+    >
+      <PlaqueCorners color={c} />
+      <Text style={[styles.plaqueLabel, { color: c }]}>{label}</Text>
     </Pressable>
   );
 }
@@ -226,6 +325,9 @@ export function ProgressBar({
  * pulses while a clip plays and flips to a clear "no audio" state when a clip
  * is missing or blocked (e.g. web autoplay) — instead of doing nothing. `play`
  * resolves `true` when a sound actually started.
+ *
+ * Rendered as a hand-pressed seal stamp (carved corners, slight tilt, cinnabar
+ * speaker glyph) so audio shares the app's one visual language — no emoji.
  */
 export function PlayButton({
   play,
@@ -273,6 +375,9 @@ export function PlayButton({
   };
 
   const unavailable = state === 'unavailable';
+  const ink = unavailable ? colors.bad : colors.primary;
+  const Glyph = unavailable ? VolumeX : Volume2;
+  const box = size + 24;
   const label =
     accessibilityLabel ?? (unavailable ? 'Audio unavailable' : 'Play audio');
   return (
@@ -286,18 +391,19 @@ export function PlayButton({
     >
       <Animated.View
         style={[
-          styles.playCircle,
+          styles.playStamp,
           {
-            width: size + 24,
-            height: size + 24,
-            borderRadius: (size + 24) / 2,
-            borderColor: unavailable ? colors.bad : colors.primary,
+            width: box,
+            height: box,
+            borderColor: ink,
             backgroundColor: unavailable ? 'transparent' : colors.primarySoft,
-            transform: [{ scale }],
+            transform: [{ scale }, { rotate: '-2deg' }],
+            // Web-only ink-bleed distortion, same as StampIcon (ignored on native).
+            ...(IS_WEB ? ({ filter: 'url(#ink-bleed)' } as unknown as ViewStyle) : null),
           },
         ]}
       >
-        <Text style={{ fontSize: size }}>{unavailable ? '🔇' : '🔊'}</Text>
+        <Glyph size={size} color={ink} strokeWidth={2.25} />
       </Animated.View>
       {(hint || unavailable) && (
         <Caption style={{ marginTop: spacing(0.5), color: unavailable ? colors.bad : colors.textDim }}>
@@ -332,12 +438,20 @@ const styles = StyleSheet.create({
   btnLabel: { fontSize: font.body, fontWeight: '800', fontFamily: fonts.sansBold },
   seal: {
     minHeight: HIT,
-    paddingVertical: spacing(1.5),
-    paddingHorizontal: spacing(3),
+    padding: 3, // the paper gap between the double rules
     borderRadius: radius.sm,
     borderWidth: 2.5,
+    alignItems: 'stretch',
+    justifyContent: 'center',
+  },
+  sealInner: {
+    flexGrow: 1,
+    borderWidth: 1.5,
+    borderRadius: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    paddingVertical: spacing(1),
+    paddingHorizontal: spacing(3),
   },
   sealLabel: {
     fontSize: font.body,
@@ -345,9 +459,36 @@ const styles = StyleSheet.create({
     letterSpacing: 3,
     textAlign: 'center',
   },
+  plaque: {
+    minHeight: HIT,
+    borderTopWidth: 2,
+    borderBottomWidth: 2,
+    borderLeftWidth: 1,
+    borderRightWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing(1.5),
+    paddingHorizontal: spacing(1),
+  },
+  plaqueLabel: {
+    fontSize: 15,
+    fontFamily: fonts.serif,
+    fontWeight: '700',
+    letterSpacing: 1.5,
+    textAlign: 'center',
+  },
   track: { borderRadius: radius.pill, overflow: 'hidden', width: '100%' },
   play: { alignItems: 'center', justifyContent: 'center' },
-  playCircle: { alignItems: 'center', justifyContent: 'center', borderWidth: 2 },
+  playStamp: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    // Slightly uneven corners → hand-carved seal, matching StampIcon.
+    borderTopLeftRadius: radius.lg,
+    borderTopRightRadius: radius.sm,
+    borderBottomRightRadius: radius.lg,
+    borderBottomLeftRadius: radius.md,
+  },
 });
 
 // Palette-dependent styles, cached per scheme.
