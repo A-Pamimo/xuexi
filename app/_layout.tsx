@@ -29,20 +29,21 @@ export default function RootLayout() {
   const [booting, setBooting] = React.useState(true);
   const { colors, scheme } = useTheme();
 
-  // The imperial type system (Inter / Noto Serif SC / Ma Shan Zheng). We gate the
-  // app render on this so first paint isn't a flash of the system font; the
-  // BootScreen covers the load. On a font error we proceed anyway (system
-  // fallback) rather than trap the user behind a spinner.
-  const [fontsLoaded, fontError] = useFonts({
+  // Gate first paint ONLY on the small Inter UI set (~1 MB) so the app boots fast.
+  // The big CJK families (Noto Serif SC ~15 MB, Ma Shan Zheng ~5.9 MB) would add
+  // ~20 s to a cold WEB load if gated, so they stream in the background instead:
+  // hanzi/wordmarks render in the system CJK fallback for a beat, then swap in
+  // when ready. On native the fonts are bundled, so there's no swap either way.
+  const [uiFontsLoaded, uiFontError] = useFonts({
     Inter_400Regular,
     Inter_500Medium,
     Inter_600SemiBold,
     Inter_700Bold,
     Inter_800ExtraBold,
-    NotoSerifSC_500Medium,
-    MaShanZheng_400Regular,
   });
-  const fontsReady = fontsLoaded || !!fontError;
+  // Fire-and-forget the heavy display fonts (not part of the boot gate).
+  useFonts({ NotoSerifSC_500Medium, MaShanZheng_400Regular });
+  const fontsReady = uiFontsLoaded || !!uiFontError;
 
   useWebFocusRing(); // web-only keyboard :focus-visible ring (no-op on native)
 
