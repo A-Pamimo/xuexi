@@ -208,7 +208,7 @@ export function FeedScreen() {
               accessibilityLabel="Play sentence audio"
             />
             <Caption style={{ marginTop: spacing(3) }}>
-              {audioLocked ? 'tap 🔊 to enable audio' : 'tap underlined words · swipe up ↑'}
+              {audioLocked ? 'tap the speaker seal to enable audio' : 'tap underlined words · swipe up ↑'}
             </Caption>
           </View>
         )}
@@ -376,10 +376,11 @@ function GlossPeek({
 }
 
 /**
- * Bounded progress bars, paper-ink style. The feed tops up endlessly, so instead
- * of one dot per (up to 40) sentence we render at most MAX bars representing
- * position proportionally: bars before the marker are done, the marker is the
- * current spot, the rest are ahead.
+ * Bounded progress markers, carved-seal style: sharp bordered segments. The feed
+ * tops up endlessly, so instead of one dot per (up to 40) sentence we render at
+ * most MAX segments representing position proportionally: segments before the
+ * marker are inked solid, the marker holds a wash of ink, the rest are empty
+ * outlines waiting for the brush.
  */
 function FeedProgress({ total, index, colors }: { total: number; index: number; colors: ThemeColors }) {
   const MAX = 7;
@@ -392,11 +393,14 @@ function FeedProgress({ total, index, colors }: { total: number; index: number; 
         <View
           key={i}
           style={{
-            height: 5,
+            height: 7,
             width: 26,
-            borderRadius: radius.pill,
+            borderRadius: 1,
+            borderWidth: 1,
             backgroundColor:
-              i < active ? colors.primary : i === active ? colors.primaryDim : colors.border,
+              i < active ? colors.primary : i === active ? `${colors.primary}33` : 'transparent',
+            borderColor:
+              i < active ? colors.primary : i === active ? `${colors.primary}88` : colors.border,
           }}
         />
       ))}

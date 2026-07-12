@@ -6,7 +6,9 @@
 import { useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
-import { Body, Button, Caption, Display, H1, PlayButton, Screen } from '../../components/ui';
+import { Volume2 } from 'lucide-react-native';
+import { Body, Button, Caption, H1, PlayButton, Screen } from '../../components/ui';
+import { DiamondSeal } from '../../components/DiamondSeal';
 import { Hanzi, Pinyin, Wordmark } from '../../components/chinese';
 import { ScrambleText } from '../../components/ScrambleText';
 import { playAsset, unlockAudio } from '../../lib/audio';
@@ -110,8 +112,8 @@ export function OnboardingScreen() {
         <FirstSentence onDone={() => setStep(4)} />
       ) : (
         <View style={styles.centerFill}>
-          <Display>🥋</Display>
-          <H1>Train your ears</H1>
+          <DiamondSeal icon={Volume2} size={84} />
+          <H1 style={{ marginTop: spacing(1) }}>Train your ears</H1>
           <Body dim style={styles.lede}>
             High-variability tone training — many speakers, fast rounds — is the
             fastest way to make tones stick. Let's play a 60-second round.
