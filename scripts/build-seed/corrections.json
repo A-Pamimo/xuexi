@@ -1,0 +1,13 @@
+{
+  "_comment": "Curated overrides for HSK entries where the source dataset assigned a rare/literary reading or a wrong/garbled gloss (the bestForm heuristic can't always disambiguate polyphonic characters). Keyed by simplified hanzi. Only `pinyinNumbered` and/or `glossEn` may be set; tonePattern is recomputed from the corrected pinyin. Applied at build time (scripts/build-seed) and to the shipped snapshot (scripts/apply-seed-corrections.mjs).",
+  "没": { "pinyinNumbered": "mei2", "glossEn": "not; (have) not; there is not" },
+  "那": { "pinyinNumbered": "na4", "glossEn": "that; those; then" },
+  "吧": { "pinyinNumbered": "ba5", "glossEn": "(sentence-final particle: suggestion or supposition)" },
+  "着": { "pinyinNumbered": "zhe5", "glossEn": "(aspect particle marking a continuous state)" },
+  "教": { "pinyinNumbered": "jiao1", "glossEn": "to teach" },
+  "长": { "pinyinNumbered": "chang2", "glossEn": "long" },
+  "为": { "pinyinNumbered": "wei4", "glossEn": "for; because of" },
+  "数": { "pinyinNumbered": "shu4", "glossEn": "number; figure" },
+  "给": { "glossEn": "to give; to; for" },
+  "钱": { "glossEn": "money" }
+}

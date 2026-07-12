@@ -149,6 +149,31 @@ function bestForm(forms: HskEntry['forms']): HskEntry['forms'][number] | undefin
   return best ?? forms[0];
 }
 
+/**
+ * Curated overrides (scripts/build-seed/corrections.json) for entries the source
+ * dataset gets wrong: rare/literary readings picked over the common one (没 as
+ * mò "drown" instead of méi "not"; 那 as nuó; 吧 as bā "bar") or garbled glosses.
+ * bestForm can't disambiguate these, so we correct them by hand. Recomputes the
+ * tone pattern whenever a reading changes.
+ */
+function applyCorrections(words: Word[]): number {
+  const raw = JSON.parse(
+    fs.readFileSync(path.join(__dirname, 'corrections.json'), 'utf8'),
+  ) as Record<string, { pinyinNumbered?: string; glossEn?: string }>;
+  let n = 0;
+  for (const w of words) {
+    const c = raw[w.hanzi];
+    if (!c || w.hanzi.startsWith('_')) continue;
+    if (c.pinyinNumbered && c.pinyinNumbered !== w.pinyinNumbered) {
+      w.pinyinNumbered = c.pinyinNumbered;
+      w.tonePattern = toneNumbersOf(c.pinyinNumbered);
+    }
+    if (c.glossEn) w.glossEn = c.glossEn;
+    n++;
+  }
+  return n;
+}
+
 /** Trim a leading "(qualifier)" / "(bound form)" so glosses read as plain meanings. */
 function cleanGloss(m: string): string {
   const s = m.trim();
@@ -280,7 +305,8 @@ async function main() {
   process.stdout.write(`  makemeahanzi: ${mmah.size} characters\n`);
 
   const { words, posByHanzi } = await buildWords(mmah);
-  process.stdout.write(`  words: ${words.length}\n`);
+  const corrected = applyCorrections(words);
+  process.stdout.write(`  words: ${words.length} (${corrected} curated corrections applied)\n`);
 
   const subtlex = loadSubtlex(await cachedFetch(SUBTLEX_URL, 'subtlex-ch-wf.json'));
   applySpokenFreq(words, subtlex);

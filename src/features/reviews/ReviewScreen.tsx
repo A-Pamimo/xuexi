@@ -20,7 +20,7 @@ import { useApp, type QueueItem } from '../../stores/appStore';
 import { font, fonts, HIT, radius, spacing } from '../../theme';
 import { useTheme } from '../../lib/appearance';
 import { knownRatio } from '../feed/selection';
-import { playWord } from '../shared/play';
+import { playSentence, playWord } from '../shared/play';
 import { BuildExercise } from './BuildExercise';
 
 // Rating → tone color, echoing the paper-ink prototype: Again→tone4 (falling/red),
@@ -65,6 +65,29 @@ function buildSentenceFor(
   return candidates[item.word.id % candidates.length] ?? null;
 }
 
+/**
+ * A worked example for a NEW word (research U3 — you encode a word better when you
+ * meet it in a real sentence, not as a bare gloss). Picks the shortest sentence
+ * containing the word whose OTHER words are mostly known, so the example itself is
+ * comprehensible i+1. Returns null when no linked sentence exists (many abstract
+ * particles have none yet — the card then falls back to the plain gloss).
+ */
+function exampleFor(word: Word, store: Store, known: Set<number>): Sentence | null {
+  const candidates = store.sentences.filter((s) => s.wordIds.includes(word.id));
+  if (candidates.length === 0) return null;
+  // Most comprehensible first (highest known-ratio), then shortest — a short,
+  // mostly-known sentence is the easiest place to see the new word do its job.
+  return (
+    candidates
+      .slice()
+      .sort(
+        (a, b) =>
+          knownRatio(b, known) - knownRatio(a, known) ||
+          a.hanzi.length - b.hanzi.length,
+      )[0] ?? null
+  );
+}
+
 export function ReviewScreen() {
   const router = useRouter();
   const store = useApp((s) => s.store)!;
@@ -94,6 +117,13 @@ export function ReviewScreen() {
   // set are stable within a session).
   const buildSentence = useMemo<Sentence | null>(
     () => (item ? buildSentenceFor(item, store, knownWordIds()) : null),
+    [item, store, knownWordIds],
+  );
+
+  // Worked example for the word being TAUGHT (new card only): a comprehensible
+  // sentence that shows the word in context (research U3). Null when none exists.
+  const example = useMemo<Sentence | null>(
+    () => (item?.isNew ? exampleFor(item.word, store, knownWordIds()) : null),
     [item, store, knownWordIds],
   );
 
@@ -260,6 +290,7 @@ export function ReviewScreen() {
             <Caption>{showBreakdown ? 'hide breakdown ▲' : 'character breakdown ▾'}</Caption>
           </Pressable>
           {showBreakdown ? <Breakdown word={item.word} /> : null}
+          {example ? <ExampleSentence sentence={example} /> : null}
         </Card>
       ) : (
         <Card style={styles.prompt}>
@@ -308,6 +339,38 @@ export function ReviewScreen() {
         <Button label="Show answer" onPress={() => setRevealed(true)} />
       )}
     </Screen>
+  );
+}
+
+/**
+ * "In context" — one comprehensible sentence using the new word, with pinyin,
+ * translation and audio. Seeing the word do a job in a real sentence is a far
+ * stronger encoding than a bare gloss (research U3), and it's the fix for abstract
+ * function words (的/了/在…) that mean nothing in isolation.
+ */
+function ExampleSentence({ sentence }: { sentence: Sentence }) {
+  const store = useApp((s) => s.store)!;
+  const { colors } = useTheme();
+  return (
+    <View style={[styles.example, { borderTopColor: colors.border }]}>
+      <Label style={{ color: colors.textDim, letterSpacing: 1 }}>IN CONTEXT</Label>
+      <View style={styles.exampleRow}>
+        <View style={{ flex: 1 }}>
+          <Hanzi text={sentence.hanzi} size={22} />
+          <View style={{ marginTop: spacing(0.5) }}>
+            <Pinyin numbered={sentence.pinyin} size={14} />
+          </View>
+          <Body dim style={{ marginTop: spacing(0.5), fontSize: 13 }}>
+            {sentence.glossEn}
+          </Body>
+        </View>
+        <PlayButton
+          size={22}
+          play={() => playSentence(store, sentence)}
+          accessibilityLabel={`Play example: ${sentence.hanzi}`}
+        />
+      </View>
+    </View>
   );
 }
 
@@ -392,4 +455,12 @@ const styles = StyleSheet.create({
     paddingTop: spacing(2),
   },
   breakRow: { flexDirection: 'row', alignItems: 'center' },
+  example: {
+    marginTop: spacing(2),
+    alignSelf: 'stretch',
+    borderTopWidth: 1,
+    paddingTop: spacing(1.5),
+    gap: spacing(0.75),
+  },
+  exampleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing(1) },
 });
