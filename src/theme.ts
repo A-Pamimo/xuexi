@@ -4,12 +4,14 @@
  * `useTheme()` (src/lib/appearance.ts). Non-color tokens (spacing, radius, type,
  * elevation) are mode-independent and stay static.
  *
- * Aesthetic — "Paper & Ink": a calm, literary surface. Warm cream "paper"
- * grounds in light mode (a near-black warm brown at night), olive "ink" as the
- * calm primary, and a warm amber accent used only at reward moments. Hanzi are
- * set in a serif (Noto Serif SC), display numerals in Space Grotesk, UI in
- * Inter. The four tone colors are the app's signature (colorblind-aware — they
- * vary in lightness, not just hue) and are AA-legible in BOTH modes.
+ * Aesthetic — "Imperial Seal": a traditional Chinese surface. Warm rice-paper
+ * grounds in light mode (a warm near-black at night), traditional cinnabar red
+ * as the primary "seal" ink, and an antique gold accent used only at reward
+ * moments. Sharp, carved-seal corners. Content hanzi stay legible in a serif
+ * (Noto Serif SC); decorative hanzi wordmarks use brush calligraphy (Ma Shan
+ * Zheng); English headings/numerals use Noto Serif SC; UI is Inter. The four
+ * tone colors are the app's signature (colorblind-aware — they vary in
+ * lightness, not just hue) and are AA-legible in BOTH modes.
  *
  * Contrast rule: light-mode tone/semantic colors are genuinely DARKENED (not
  * inverted neutrals) — the dark tone hexes fail AA as ink on white. A Jest test
@@ -43,20 +45,20 @@ export interface ThemeColors {
 }
 
 export const darkColors: ThemeColors = {
-  bg: '#1C1C19', // warm near-black "night paper"
-  bgElevated: '#2D2D26', // raised chrome (tab bar, sheets)
-  surface: '#2D2D26',
-  surfaceAlt: '#3A3A32',
-  border: '#3A3A32',
-  borderStrong: '#4A4A40',
-  text: '#E8E2D6', // warm paper ink
+  bg: '#1C1C19', // warm near-black "night rice paper"
+  bgElevated: '#2A2A28', // raised chrome (tab bar, sheets)
+  surface: '#2A2A28',
+  surfaceAlt: '#35332C',
+  border: '#46433B',
+  borderStrong: '#55524A',
+  text: '#EBE3D0', // warm paper ink
   textDim: '#A39C8C',
-  primary: '#C69A6A', // warm brown "ink", brightened for a dark ground
-  primaryDim: '#A67C52',
-  primarySoft: '#2A251E', // tinted fill behind primary content
-  onPrimary: '#1C1C19', // dark ink on the warm-brown fill
-  accent: '#C69A6A', // warm brown — reward / milestones only
-  onAccent: '#241503', // dark ink on amber/gold fills
+  primary: '#E24A4A', // cinnabar red, brightened for a dark ground (AA as ink on bg)
+  primaryDim: '#B22222',
+  primarySoft: '#2E1E1C', // tinted fill behind primary content
+  onPrimary: '#0A0A0A', // near-black ink on the bright cinnabar fill
+  accent: '#E0B44A', // antique gold — reward / milestones only
+  onAccent: '#241503', // dark ink on gold fills
   good: '#5FB87E',
   bad: '#E06B6B',
   gold: '#E0B44A',
@@ -67,24 +69,24 @@ export const darkColors: ThemeColors = {
 };
 
 export const lightColors: ThemeColors = {
-  bg: '#FDFBF7', // warm cream "paper"
-  bgElevated: '#FFFFFF',
-  surface: '#FFFFFF',
-  surfaceAlt: '#F0EDE6',
-  border: '#E8E2D6',
-  borderStrong: '#D9CFBB',
-  text: '#2D2D26', // warm ink
-  textDim: '#6B6455', // darkened from the paper-ink #8C8578 so it's AA body on cream
-  primary: '#5A5A40', // olive "ink" — AA as ink on paper
-  primaryDim: '#47472F',
-  primarySoft: '#ECE7DB',
-  onPrimary: '#FDFBF7',
-  accent: '#C4740A', // warm amber — reward moments; darkened for AA
-  onAccent: '#241503', // dark ink — white on mid-amber fails AA; dark ink passes
+  bg: '#F4EEDF', // warm rice paper
+  bgElevated: '#FBF7EC',
+  surface: '#FBF7EC',
+  surfaceAlt: '#EBE3D0',
+  border: '#D8CEB9',
+  borderStrong: '#C3B79B',
+  text: '#2A2A28', // near-black ink
+  textDim: '#5E5648', // darkened so it's AA body on the (darker) rice paper
+  primary: '#B22222', // cinnabar red — AA as ink on paper
+  primaryDim: '#8B0000',
+  primarySoft: '#EFDCD5',
+  onPrimary: '#F4EEDF', // paper ink on the cinnabar fill
+  accent: '#C68A3E', // antique gold/bronze — reward moments
+  onAccent: '#140B02', // near-black ink — passes AA on gold/bronze fills
 
   good: '#276749',
   bad: '#991B1B',
-  gold: '#B7791F',
+  gold: '#A9741E',
   tone1: '#2F67A8',
   tone2: '#276749',
   tone3: '#9A3412',
@@ -122,33 +124,37 @@ export const TONE_NAMES = ['high & flat', 'rising', 'dip', 'falling'] as const;
 
 export const spacing = (n: number): number => n * 8;
 
-export const radius = { sm: 8, md: 14, lg: 22, xl: 28, pill: 999 } as const;
+// Sharp, carved-seal corners — the imperial look. `pill` stays for genuinely
+// circular elements (goal ring, avatar, play-button circle).
+export const radius = { sm: 2, md: 4, lg: 6, xl: 10, pill: 999 } as const;
 
 /**
  * Loaded font family names — these MUST match the keys registered by useFonts()
  * in app/_layout.tsx. RN ignores numeric fontWeight for custom families, so the
- * weight is baked into the family name and applied via fontFamily. Three roles:
- * `sans` (Inter, UI), `display` (Space Grotesk, big/tabular numerals & headings)
- * and `serif` (Noto Serif SC, the signature hanzi typeface).
+ * weight is baked into the family name and applied via fontFamily. Roles:
+ * `sans` (Inter, UI), `serif` (Noto Serif SC — content hanzi AND English
+ * headings/numerals), and `calligraphy` (Ma Shan Zheng — decorative hanzi
+ * WORDMARKS only; it's a Chinese-only brush font with poor Latin coverage and
+ * low small-size legibility, so it never touches content hanzi or Latin text).
  */
 export const fonts = {
   sans: 'Inter_500Medium',
   sansSemibold: 'Inter_600SemiBold',
   sansBold: 'Inter_700Bold',
   sansExtrabold: 'Inter_800ExtraBold',
-  display: 'SpaceGrotesk_600SemiBold',
-  displayBold: 'SpaceGrotesk_700Bold',
-  // One serif weight only — Noto Serif SC is ~15 MB/weight, so we bundle a single
-  // Medium and render all hanzi in it (lighter & more literary than a heavy bold,
-  // matching the paper-ink prototype's large glyphs).
+  // Noto Serif SC (single ~15 MB Medium weight) carries hanzi, headings & numerals.
   serif: 'NotoSerifSC_500Medium',
+  display: 'NotoSerifSC_500Medium',
+  displayBold: 'NotoSerifSC_500Medium',
+  // Brush calligraphy — hanzi wordmarks only (see note above).
+  calligraphy: 'MaShanZheng_400Regular',
 } as const;
 
 /** Type ramp: role → size / family / line-height. Use via <Text> variants in ui.tsx. */
 export const type = {
-  display: { fontSize: 40, fontWeight: '900', fontFamily: fonts.displayBold, lineHeight: 44 },
-  h1: { fontSize: 26, fontWeight: '800', fontFamily: fonts.displayBold, lineHeight: 32 },
-  h2: { fontSize: 20, fontWeight: '800', fontFamily: fonts.display, lineHeight: 26 },
+  display: { fontSize: 40, fontWeight: '900', fontFamily: fonts.display, lineHeight: 46 },
+  h1: { fontSize: 26, fontWeight: '800', fontFamily: fonts.display, lineHeight: 34 },
+  h2: { fontSize: 20, fontWeight: '800', fontFamily: fonts.display, lineHeight: 28 },
   body: { fontSize: 16, fontWeight: '500', fontFamily: fonts.sans, lineHeight: 23 },
   label: { fontSize: 15, fontWeight: '700', fontFamily: fonts.sansBold, lineHeight: 20 },
   caption: { fontSize: 13, fontWeight: '600', fontFamily: fonts.sansSemibold, lineHeight: 18 },

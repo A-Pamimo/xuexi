@@ -7,7 +7,7 @@ import { useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Body, Button, Caption, Display, H1, PlayButton, Screen } from '../../components/ui';
-import { Hanzi, Pinyin } from '../../components/chinese';
+import { Hanzi, Pinyin, Wordmark } from '../../components/chinese';
 import { ScrambleText } from '../../components/ScrambleText';
 import { playAsset, unlockAudio } from '../../lib/audio';
 import { track } from '../../lib/analytics';
@@ -67,13 +67,13 @@ export function OnboardingScreen() {
       <Dots step={step} />
       {step === 0 ? (
         <View style={styles.centerFill}>
-          <Hanzi text="学习" size={80} />
+          <Wordmark text="学习" size={96} color={colors.primary} />
           <H1>Welcome to xuexi</H1>
           <Body dim style={styles.lede}>
             Learn Mandarin the way your phone already hooks you — swipeable input,
             tone games, streaks and combos, all pointed at real fluency.
           </Body>
-          <Button label="Let's go" onPress={() => setStep(1)} style={styles.cta} />
+          <Button label="Let's go" variant="seal" onPress={() => setStep(1)} style={styles.cta} />
         </View>
       ) : step === 1 ? (
         <FirstWord onDone={() => setStep(2)} />
@@ -104,7 +104,7 @@ export function OnboardingScreen() {
               </View>
             ))}
           </View>
-          <Button label="I hear the difference" onPress={() => setStep(3)} />
+          <Button label="I hear the difference" variant="seal" onPress={() => setStep(3)} />
         </View>
       ) : step === 3 ? (
         <FirstSentence onDone={() => setStep(4)} />
@@ -116,7 +116,7 @@ export function OnboardingScreen() {
             High-variability tone training — many speakers, fast rounds — is the
             fastest way to make tones stick. Let's play a 60-second round.
           </Body>
-          <Button label="Enter the Tone Dojo" onPress={finish} style={styles.cta} />
+          <Button label="Enter the Tone Dojo" variant="seal" onPress={finish} style={styles.cta} />
         </View>
       )}
     </Screen>
@@ -204,7 +204,7 @@ function FirstWord({ onDone }: { onDone: () => void }) {
           <Caption style={{ color: colors.good, marginTop: spacing(1.5) }}>
             Nailed it — 茶 means “tea.”
           </Caption>
-          <Button label="Keep going" onPress={onDone} style={styles.cta} />
+          <Button label="Keep going" variant="seal" onPress={onDone} style={styles.cta} />
         </>
       ) : null}
     </View>
@@ -280,7 +280,7 @@ function FirstSentence({ onDone }: { onDone: () => void }) {
         Every word here is one you already know. This is comprehensible input — and
         your whole feed will feel exactly like this.
       </Body>
-      <Button label="Let's train" onPress={onDone} style={styles.cta} />
+      <Button label="Let's train" variant="seal" onPress={onDone} style={styles.cta} />
     </View>
   );
 }

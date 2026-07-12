@@ -76,10 +76,11 @@ await page.getByText('I hear the difference').click();
 await page.getByText('You just read Chinese').waitFor({ timeout: 4000 });
 await page.getByText("Let's train").click();
 await page.getByText('Enter the Tone Dojo').click();
-await page.getByText('Tone Dojo').first().waitFor({ timeout: 4000 });
 
 // Tabs present? Target the tab bar by role so screen copy can't shadow a label.
+// (The dojo tab is labelled "Dojo".) Reaching the tab bar confirms onboarding done.
 const tab = (name) => page.getByRole('tab', { name });
+await tab('Dojo').waitFor({ timeout: 4000 });
 await tab('Feed').waitFor({ timeout: 4000 });
 
 // Visit each tab and confirm it renders something meaningful.
