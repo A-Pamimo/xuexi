@@ -16,9 +16,10 @@ import {
   type ViewToken,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Settings2 } from 'lucide-react-native';
+import { Check, Settings2 } from 'lucide-react-native';
 import { Body, Button, Caption, H1, Pill, PlayButton, Screen } from '../../components/ui';
 import { Hanzi, Pinyin } from '../../components/chinese';
+import { DiamondSeal } from '../../components/DiamondSeal';
 import { StampIcon } from '../../components/StampIcon';
 import { Ticker } from '../../components/Ticker';
 import { DailyGoalRing } from '../../components/DailyGoalRing';
@@ -42,6 +43,15 @@ interface Token {
   text: string;
   word: Word | null;
 }
+
+/**
+ * The feed session is finite on purpose: after the last sentence the list ends
+ * on a ceremonial "done for today" seal card (no button, no continue) — the
+ * calm counterpart of an infinite feed. One sentinel item carries it.
+ */
+const DONE_CARD = { kind: 'done' } as const;
+type FeedItem = Sentence | typeof DONE_CARD;
+const isDoneCard = (item: FeedItem): item is typeof DONE_CARD => 'kind' in item;
 
 export function FeedScreen() {
   const store = useApp((s) => s.store)!;
@@ -121,8 +131,8 @@ export function FeedScreen() {
   const onViewable = useRef(({ viewableItems }: { viewableItems: ViewToken[] }) => {
     const first = viewableItems[0];
     if (first?.index != null) setCurrentIndex(first.index);
-    const sentence = first?.item as Sentence | undefined;
-    if (sentence && isAudioUnlocked()) void playSentence(store, sentence);
+    const item = first?.item as FeedItem | undefined;
+    if (item && !isDoneCard(item) && isAudioUnlocked()) void playSentence(store, item);
   }).current;
 
   const tokenize = useCallback(
@@ -150,6 +160,9 @@ export function FeedScreen() {
     [store],
   );
 
+  // The day's sentences plus the closing seal card.
+  const items = useMemo<FeedItem[]>(() => [...feed, DONE_CARD], [feed]);
+
   if (feed.length === 0) {
     return (
       <Screen center>
@@ -165,15 +178,34 @@ export function FeedScreen() {
     <View style={styles.root}>
       {AMBIENT_BACKGROUND ? <AmbientBackground /> : null}
       <FlatList
-        data={feed}
-        keyExtractor={(s) => String(s.id)}
+        data={items}
+        keyExtractor={(s) => (isDoneCard(s) ? 'done' : String(s.id))}
         pagingEnabled
         showsVerticalScrollIndicator={false}
         snapToInterval={height}
         decelerationRate="fast"
+        // Every card is exactly one viewport tall. Without this, virtualization
+        // ESTIMATES unrendered cell offsets from a running average, so deep in
+        // the list the scroll offset drifts off the card grid — snap intervals
+        // land mid-card and any offset→index math is wrong.
+        getItemLayout={(_, index) => ({ length: height, offset: height * index, index })}
         onViewableItemsChanged={onViewable}
         viewabilityConfig={{ itemVisiblePercentThreshold: 60 }}
+        // Viewability callbacks don't fire on react-native-web, so the progress
+        // ticks would freeze there; deriving the index from the scroll offset
+        // works on every platform (native keeps viewability for autoplay).
+        onScroll={(e) => {
+          const i = Math.min(
+            Math.max(Math.round(e.nativeEvent.contentOffset.y / height), 0),
+            items.length - 1,
+          );
+          setCurrentIndex(i);
+        }}
+        scrollEventThrottle={32}
         renderItem={({ item }) => (
+          isDoneCard(item) ? (
+            <DoneForToday height={height} />
+          ) : (
           <View style={[styles.card, { height }]}>
             <View style={styles.hanziWrap}>
               {tokenize(item).map((tok, idx) =>
@@ -211,6 +243,7 @@ export function FeedScreen() {
               {audioLocked ? 'tap the speaker seal to enable audio' : 'tap underlined words · swipe up ↑'}
             </Caption>
           </View>
+          )
         )}
       />
 
@@ -286,6 +319,26 @@ export function FeedScreen() {
         }}
         onClose={() => { juice.tap(); setSelected(null); }}
       />
+    </View>
+  );
+}
+
+/**
+ * The end of the day's scroll: a ceremonial diamond seal pressed under the last
+ * sentence. Deliberately has no button and nothing to tap — the session is
+ * over, and the card says so in the app's quiet voice.
+ */
+function DoneForToday({ height }: { height: number }) {
+  return (
+    <View style={{ height, justifyContent: 'center', alignItems: 'center', padding: spacing(3) }}>
+      <DiamondSeal icon={Check} size={72} />
+      <H1 style={{ marginTop: spacing(3), textAlign: 'center' }}>You're done for today.</H1>
+      <Body
+        dim
+        style={{ marginTop: spacing(1), textAlign: 'center', fontStyle: 'italic', fontFamily: fonts.serif }}
+      >
+        Rest your mind. The ink is dry.
+      </Body>
     </View>
   );
 }
@@ -386,7 +439,9 @@ function FeedProgress({ total, index, colors }: { total: number; index: number; 
   const MAX = 7;
   const count = Math.min(Math.max(total, 1), MAX);
   const activeExact = total <= 1 ? 0 : (index / (total - 1)) * (count - 1);
-  const active = Math.round(activeExact);
+  // Past the last sentence (the done-for-today seal card) every segment is
+  // inked solid — the day's scroll is complete.
+  const active = index >= total ? count : Math.round(activeExact);
   return (
     <>
       {Array.from({ length: count }).map((_, i) => (
