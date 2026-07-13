@@ -1,6 +1,6 @@
 import { Redirect, Tabs } from 'expo-router';
 import React from 'react';
-import { Text, View } from 'react-native';
+import { Platform, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { fonts } from '../../src/theme';
 import { useApp } from '../../src/stores/appStore';
@@ -8,6 +8,8 @@ import { unlockAudio } from '../../src/lib/audio';
 import * as juice from '../../src/lib/juice';
 import { useTheme } from '../../src/lib/appearance';
 import { ScrollRoller } from '../../src/components/ScrollRoller';
+import { AmbientBackground } from '../../src/components/AmbientBackground';
+import { AMBIENT_BACKGROUND } from '../../src/lib/flags';
 
 /** A tab glyph (single hanzi) with a small cinnabar diamond under the active one. */
 function TabIcon({ glyph, color, focused }: { glyph: string; color: string; focused: boolean }) {
@@ -57,6 +59,13 @@ export default function TabsLayout() {
         paddingBottom: insets.bottom,
       }}
     >
+      {/* The ONE ambient shader mount — all tabs share this single GL context
+          (their scenes render transparent above it). Mounting per screen would
+          keep up to four live GL contexts, since visited tabs stay mounted.
+          Native only: on web react-navigation paints inactive scenes, so a
+          transparent focused scene shows STALE SIBLING TABS, not the shader —
+          web scenes stay opaque (below) and skip the aurora entirely. */}
+      {AMBIENT_BACKGROUND && Platform.OS !== 'web' ? <AmbientBackground /> : null}
       <ScrollRoller edge="top" />
       <Tabs
         screenListeners={{
@@ -69,7 +78,10 @@ export default function TabsLayout() {
         }}
         screenOptions={{
           headerShown: false,
-          sceneStyle: { backgroundColor: colors.bg },
+          // Native: transparent scenes so the shared ambient backdrop shows
+          // through. Web: opaque paper — inactive tabs stay painted there, and
+          // transparency would let them ghost through the focused scene.
+          sceneStyle: { backgroundColor: Platform.OS === 'web' ? colors.bg : 'transparent' },
           tabBarStyle: {
             backgroundColor: colors.bgElevated,
             borderTopColor: colors.borderStrong,

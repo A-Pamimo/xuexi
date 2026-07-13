@@ -1,12 +1,9 @@
 /**
- * Canonical SQLite schema for xuexi. This DDL is the single source of truth used
- * both by the build-time seed pipeline (better-sqlite3, scripts/build-seed) and
- * by the native runtime store (expo-sqlite, store.native impl).
- *
- * Immutable CONTENT tables (words, sentences, audio_refs) are populated by the
- * pipeline and shipped in assets/db/xuexi-seed.db. Mutable PROGRESS tables
- * (cards, tone_drill_results, session_logs, user_stats) start empty and are
- * written at runtime.
+ * SQLite schema for the BUILD-TIME seed pipeline (better-sqlite3). The runtime
+ * app does not open SQLite at all — it hydrates content from the bundled
+ * seed.json and keeps mutable progress as a JSON blob (see src/lib/db/store.ts
+ * + persistence.ts). This DDL only shapes the canonical assets/db/xuexi-seed.db
+ * artifact that seed.json is exported from.
  */
 export const SEED_VERSION = 2;
 

@@ -5,8 +5,8 @@
  * (hanzi->meaning or audio->meaning). New words arrive in spoken-frequency order
  * (basics first) and are capped per session so the intro stays gradual.
  */
-import { useRouter } from 'expo-router';
-import React, { useEffect, useMemo, useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Check } from 'lucide-react-native';
 import { Body, Button, Caption, Card, H1, Label, PlaqueButton, PlayButton, ProgressBar, Screen } from '../../components/ui';
@@ -87,6 +87,20 @@ export function ReviewScreen() {
   const [reviewed, setReviewed] = useState(0);
   const [flash, setFlash] = useState<string | null>(null);
 
+  // One tracked timer for the reward flash: rating faster than the 700ms decay
+  // must not leave stale timers behind to clear the NEXT card's flash.
+  const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const scheduleFlashClear = () => {
+    if (flashTimer.current) clearTimeout(flashTimer.current);
+    flashTimer.current = setTimeout(() => setFlash(null), 700);
+  };
+  useEffect(
+    () => () => {
+      if (flashTimer.current) clearTimeout(flashTimer.current);
+    },
+    [],
+  );
+
   const item = queue[idx];
   const isNew = !!item?.isNew;
 
@@ -118,8 +132,9 @@ export function ReviewScreen() {
     setShowBreakdown(false);
   }, [idx]);
 
-  // Silence audio when leaving the screen.
-  useEffect(() => () => void stopAudio(), []);
+  // Silence audio when leaving the screen. Focus effect, not unmount: tab
+  // screens stay mounted, so only the blur callback fires on a tab switch.
+  useFocusEffect(useCallback(() => () => void stopAudio(), []));
 
   if (!item) {
     const known = knownWordIds().size;
@@ -173,7 +188,7 @@ export function ReviewScreen() {
     }
     setReviewed((n) => n + 1);
     setGainedXp((x) => x + gained);
-    setTimeout(() => setFlash(null), 700);
+    scheduleFlashClear();
     setIdx((i) => i + 1);
   };
 
@@ -196,13 +211,14 @@ export function ReviewScreen() {
     }
     setReviewed((n) => n + 1);
     setGainedXp((x) => x + gained);
-    setTimeout(() => setFlash(null), 700);
+    scheduleFlashClear();
     setIdx((i) => i + 1);
   };
 
   // Mature-card production drill takes over the whole card (its own Screen).
+  // Keyed by sentence so consecutive build drills never share picked/result state.
   if (buildSentence) {
-    return <BuildExercise sentence={buildSentence} onDone={buildDone} />;
+    return <BuildExercise key={buildSentence.id} sentence={buildSentence} onDone={buildDone} />;
   }
 
   const goal = goalToday();

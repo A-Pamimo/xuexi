@@ -3,6 +3,7 @@
  * audio (autoplay on focus), tappable words (tap = gloss + add-to-SRS), and a
  * pinyin toggle. Feed seconds count toward input hours + streak integrity.
  */
+import { useFocusEffect } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
@@ -24,7 +25,7 @@ import { StampIcon } from '../../components/StampIcon';
 import { Ticker } from '../../components/Ticker';
 import { DailyGoalRing } from '../../components/DailyGoalRing';
 import { SettingsSheet } from '../../components/SettingsSheet';
-import { isAudioUnlocked, unlockAudio as unlockAudioGlobal } from '../../lib/audio';
+import { isAudioUnlocked, stopAudio, unlockAudio as unlockAudioGlobal } from '../../lib/audio';
 import * as juice from '../../lib/juice';
 import { useReducedMotion } from '../../lib/motion';
 import type { Sentence, Word } from '../../lib/types';
@@ -32,8 +33,6 @@ import { useApp } from '../../stores/appStore';
 import { elevation, font, fonts, radius, spacing } from '../../theme';
 import type { ThemeColors } from '../../theme';
 import { useTheme, useThemedStyles } from '../../lib/appearance';
-import { AmbientBackground } from '../../components/AmbientBackground';
-import { AMBIENT_BACKGROUND } from '../../lib/flags';
 import { selectFeed } from './selection';
 import { playSentence, playWord } from '../shared/play';
 
@@ -118,6 +117,11 @@ export function FeedScreen() {
     });
   }, [store, knownWordIds]);
 
+  // Silence any in-flight sentence when leaving the feed — otherwise it plays
+  // on into the next tab. Focus effect, not unmount: tab screens stay mounted,
+  // so only the blur callback actually fires on a tab switch.
+  useFocusEffect(useCallback(() => () => void stopAudio(), []));
+
   // Accumulate feed time while this screen is mounted.
   const secs = useRef(0);
   useEffect(() => {
@@ -176,7 +180,6 @@ export function FeedScreen() {
 
   return (
     <View style={styles.root}>
-      {AMBIENT_BACKGROUND ? <AmbientBackground /> : null}
       <FlatList
         data={items}
         keyExtractor={(s) => (isDoneCard(s) ? 'done' : String(s.id))}

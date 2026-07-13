@@ -20,7 +20,7 @@ import {
   SCHEMA_SQL,
   INITIAL_USER_STATS_SQL,
   SEED_VERSION,
-} from '../../src/lib/db/schema';
+} from './schema';
 import { toneNumbersOf } from '../../src/lib/pinyin';
 import type { ComponentBreakdown, Word } from '../../src/lib/types';
 import { generateSentences } from './sentences';
