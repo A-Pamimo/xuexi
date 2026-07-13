@@ -6,20 +6,16 @@
  * Everything degrades gracefully: with no Firebase config the app runs fully as
  * a local guest (isCloudConfigured() === false and the sign-in UI stays hidden).
  *
+ * Firebase is loaded via dynamic import() on first use, so the (large) SDK
+ * stays out of the initial web bundle entirely — and out of unconfigured
+ * builds' network traffic too, since ensure() never imports it without config.
+ *
  * Config comes from EXPO_PUBLIC_FIREBASE_* env vars, embedded at build time.
  * These values are NOT secrets (a web Firebase config is public by design —
  * Firestore security rules protect the data, not the config).
  */
-import { initializeApp, getApps, type FirebaseApp } from 'firebase/app';
-import {
-  getAuth,
-  GoogleAuthProvider,
-  onAuthStateChanged,
-  signInWithPopup,
-  signOut,
-  type Auth,
-} from 'firebase/auth';
-import { doc, getDoc, getFirestore, setDoc, type Firestore } from 'firebase/firestore';
+import type { Auth } from 'firebase/auth';
+import type { Firestore } from 'firebase/firestore';
 import type { ProgressBlob } from './db/store';
 
 export interface CloudUser {
@@ -43,55 +39,74 @@ export function isCloudConfigured(): boolean {
   return Boolean(cfg.apiKey && cfg.authDomain && cfg.projectId && cfg.appId);
 }
 
-let app: FirebaseApp | null = null;
-let auth: Auth | null = null;
-let db: Firestore | null = null;
-
-function ensure(): { auth: Auth; db: Firestore } | null {
-  if (!isCloudConfigured()) return null;
-  if (!app) {
-    app = getApps().length ? getApps()[0]! : initializeApp(cfg);
-    auth = getAuth(app);
-    db = getFirestore(app);
-  }
-  return { auth: auth!, db: db! };
+interface Fire {
+  auth: Auth;
+  db: Firestore;
+  fbAuth: typeof import('firebase/auth');
+  fbFs: typeof import('firebase/firestore');
 }
 
-/** Idempotent — Firebase initializes lazily on first use; nothing to do eagerly. */
+let firePromise: Promise<Fire | null> | null = null;
+
+function ensure(): Promise<Fire | null> {
+  if (!isCloudConfigured()) return Promise.resolve(null);
+  if (!firePromise) {
+    firePromise = (async () => {
+      const [fbApp, fbAuth, fbFs] = await Promise.all([
+        import('firebase/app'),
+        import('firebase/auth'),
+        import('firebase/firestore'),
+      ]);
+      const app = fbApp.getApps().length ? fbApp.getApps()[0]! : fbApp.initializeApp(cfg);
+      return { auth: fbAuth.getAuth(app), db: fbFs.getFirestore(app), fbAuth, fbFs };
+    })();
+  }
+  return firePromise;
+}
+
+/** Idempotent — kicks off the lazy SDK load so a returning session restores promptly. */
 export function initCloud(): void {
-  ensure();
+  void ensure();
 }
 
-/** Subscribe to sign-in state. Fires immediately with the current user (or null). */
+/** Subscribe to sign-in state. Fires with the current user (or null) once known. */
 export function subscribeAuth(cb: (user: CloudUser | null) => void): () => void {
-  const c = ensure();
-  if (!c) {
-    cb(null);
-    return () => {};
-  }
-  return onAuthStateChanged(c.auth, (u) =>
-    cb(u ? { uid: u.uid, name: u.displayName, email: u.email, photoURL: u.photoURL } : null),
-  );
+  let unsub: (() => void) | null = null;
+  let cancelled = false;
+  void ensure().then((c) => {
+    if (!c) {
+      cb(null);
+      return;
+    }
+    if (cancelled) return;
+    unsub = c.fbAuth.onAuthStateChanged(c.auth, (u) =>
+      cb(u ? { uid: u.uid, name: u.displayName, email: u.email, photoURL: u.photoURL } : null),
+    );
+  });
+  return () => {
+    cancelled = true;
+    unsub?.();
+  };
 }
 
 export async function signInWithGoogle(): Promise<void> {
-  const c = ensure();
+  const c = await ensure();
   if (!c) throw new Error('Cloud sign-in is not configured');
-  const provider = new GoogleAuthProvider();
-  await signInWithPopup(c.auth, provider);
+  const provider = new c.fbAuth.GoogleAuthProvider();
+  await c.fbAuth.signInWithPopup(c.auth, provider);
 }
 
 export async function signOutUser(): Promise<void> {
-  const c = ensure();
+  const c = await ensure();
   if (!c) return;
-  await signOut(c.auth);
+  await c.fbAuth.signOut(c.auth);
 }
 
 /** Read a user's cloud progress blob, or null if they have none yet. */
 export async function pullProgress(uid: string): Promise<Partial<ProgressBlob> | null> {
-  const c = ensure();
+  const c = await ensure();
   if (!c) return null;
-  const snap = await getDoc(doc(c.db, 'users', uid));
+  const snap = await c.fbFs.getDoc(c.fbFs.doc(c.db, 'users', uid));
   if (!snap.exists()) return null;
   const raw = snap.data()?.blob;
   if (typeof raw !== 'string') return null;
@@ -104,7 +119,10 @@ export async function pullProgress(uid: string): Promise<Partial<ProgressBlob> |
 
 /** Write a user's progress blob (stored as a JSON string — Firestore-safe). */
 export async function pushProgress(uid: string, blob: Omit<ProgressBlob, 'analytics'>): Promise<void> {
-  const c = ensure();
+  const c = await ensure();
   if (!c) return;
-  await setDoc(doc(c.db, 'users', uid), { blob: JSON.stringify(blob), updatedAt: Date.now() });
+  await c.fbFs.setDoc(c.fbFs.doc(c.db, 'users', uid), {
+    blob: JSON.stringify(blob),
+    updatedAt: Date.now(),
+  });
 }

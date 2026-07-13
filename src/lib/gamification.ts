@@ -133,6 +133,39 @@ export function advanceStreak(stats: UserStats, today: string): UserStats {
 }
 
 /**
+ * Rebuild the streak tuple from scratch out of a session history, replaying
+ * `advanceStreak` over every qualifying day in date order. Used by the cloud
+ * merge: streak/lastStreakDate/streakFreezes must travel as an atomic tuple
+ * (taking field-wise maxima can pair a stale device's high streak with a fresh
+ * date, resurrecting a broken streak), and the merged sessions are the one
+ * loss-free record both devices agree on — days studied on either device count.
+ */
+export function rebuildStreak(
+  sessions: SessionLog[],
+): Pick<UserStats, 'streak' | 'lastStreakDate' | 'streakFreezes'> {
+  let acc: UserStats = {
+    streak: 0,
+    lastStreakDate: null,
+    streakFreezes: 0,
+    totalInputMinutes: 0,
+    knownWordCount: 0,
+    xp: 0,
+    level: 1,
+    unlocks: [],
+  };
+  const days = sessions
+    .filter(dayQualifies)
+    .map((s) => s.date)
+    .sort();
+  for (const day of days) acc = advanceStreak(acc, day);
+  return {
+    streak: acc.streak,
+    lastStreakDate: acc.lastStreakDate,
+    streakFreezes: acc.streakFreezes,
+  };
+}
+
+/**
  * Forgiving rolling hit-rate (research P0-4 / U6): a "41 of 42 days" measure that
  * sits alongside the all-or-nothing streak so a single missed day is not framed
  * as total loss. `window` is capped at days since first activity so new users

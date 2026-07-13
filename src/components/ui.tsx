@@ -24,8 +24,6 @@ import { elevation, font, fonts, HIT, radius, spacing, type } from '../theme';
 import type { ThemeColors } from '../theme';
 import { useReducedMotion } from '../lib/motion';
 import { useTheme, type Scheme } from '../lib/appearance';
-import { AmbientBackground } from './AmbientBackground';
-import { AMBIENT_BACKGROUND } from '../lib/flags';
 
 // Color-dependent styles are built per palette and cached by scheme (only two
 // ever exist), so switching themes never rebuilds a StyleSheet and layout props
@@ -50,20 +48,18 @@ export function Screen({
   children: React.ReactNode;
   style?: ViewStyle;
   center?: boolean;
-  /** Render the ambient shader backdrop behind content (tab screens opt in;
-   *  onboarding/boot deliberately don't, to keep GL off the cold-load path). */
+  /** Stay transparent so the shared ambient backdrop (mounted ONCE in the tabs
+   *  layout) shows through. Screens outside the tabs (onboarding/boot) leave
+   *  this off and get an opaque themed surface — GL stays off the cold-load path. */
   ambient?: boolean;
 }) {
   const { colors } = useTheme();
-  // Opt-in ambient: an opaque themed base + the shader behind content. Without it
-  // the Screen is a plain themed surface. Content sits on cards (opaque) so text
-  // legibility is unaffected either way.
+  // Content sits on cards (opaque) so text legibility is unaffected either way.
   return (
     <SafeAreaView
       style={[styles.screen, { backgroundColor: ambient ? undefined : colors.bg }]}
       edges={['top']}
     >
-      {ambient && AMBIENT_BACKGROUND ? <AmbientBackground /> : null}
       <View
         style={[
           { flex: 1, padding: spacing(2) },

@@ -49,6 +49,10 @@ export function ToneDojoScreen() {
   const [q, setQ] = useState<Question | null>(null);
   const [feedback, setFeedback] = useState<{ correct: boolean; tone: ToneNumber } | null>(null);
   const [combo, setCombo] = useState(0);
+  // Ref mirror of `combo` for the answer path: the master-tick interval calls
+  // answer(null) on a timeout, and reading combo state there is one render
+  // stale during a streak — the recorded XP/combo would be off by one.
+  const comboRef = useRef(0);
   const [maxCombo, setMaxCombo] = useState(0);
   const [score, setScore] = useState({ correct: 0, total: 0 });
   const [sessionLeft, setSessionLeft] = useState(SESSION_MS);
@@ -97,6 +101,7 @@ export function ToneDojoScreen() {
     setPhase('playing');
     setScore({ correct: 0, total: 0 });
     setCombo(0);
+    comboRef.current = 0;
     setMaxCombo(0);
     setSessionLeft(SESSION_MS);
     questionStart.current = Date.now();
@@ -108,7 +113,7 @@ export function ToneDojoScreen() {
       if (!q || locked.current) return;
       locked.current = true;
       const correct = chosen === q.tone;
-      const nextCombo = correct ? combo + 1 : 0;
+      const nextCombo = correct ? comboRef.current + 1 : 0;
       setScore((s) => ({ correct: s.correct + (correct ? 1 : 0), total: s.total + 1 }));
       setFeedback({ correct, tone: q.tone });
       recordTone(
@@ -123,6 +128,7 @@ export function ToneDojoScreen() {
         correct,
         nextCombo,
       );
+      comboRef.current = nextCombo;
       if (correct) {
         setCombo(nextCombo);
         setMaxCombo((m) => Math.max(m, nextCombo));
@@ -136,7 +142,7 @@ export function ToneDojoScreen() {
         if (Date.now() - questionStart.current < SESSION_MS) nextQuestion();
       }, 650);
     },
-    [q, combo, recordTone, nextQuestion],
+    [q, recordTone, nextQuestion],
   );
 
   // Master tick: session countdown + per-question shrinking timer.

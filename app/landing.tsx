@@ -4,8 +4,8 @@
  * guest, or sign in with Google to save & sync progress across devices. Signed-in
  * returning users (with cloud data) skip straight past this via the effect below.
  */
-import { useRouter } from 'expo-router';
-import React, { useEffect } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import React, { useCallback } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { Layers, Mic2, Sparkles, type LucideIcon } from 'lucide-react-native';
 import { Body, Button, Caption, H2, Screen } from '../src/components/ui';
@@ -32,13 +32,18 @@ export default function Landing() {
   // Route away once we know where the visitor belongs: onboarded users (incl. a
   // returning signed-in account whose cloud data restored) go to the app; a fresh
   // sign-in with no prior progress drops into onboarding once sync settles.
-  useEffect(() => {
-    if (onboarded) {
-      router.replace('/');
-    } else if (user && !syncing) {
-      router.replace('/onboarding');
-    }
-  }, [onboarded, user, syncing, router]);
+  // Focus-scoped: landing stays mounted under the onboarding modal, and a plain
+  // effect here would fire when completeOnboarding() flips `onboarded`, clobbering
+  // onboarding's own replace('/dojo') and dumping the learner on the feed instead.
+  useFocusEffect(
+    useCallback(() => {
+      if (onboarded) {
+        router.replace('/');
+      } else if (user && !syncing) {
+        router.replace('/onboarding');
+      }
+    }, [onboarded, user, syncing, router]),
+  );
 
   return (
     <Screen>

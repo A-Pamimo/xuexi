@@ -6,6 +6,7 @@ import {
   goalProgress,
   levelForXp,
   levelProgress,
+  rebuildStreak,
   rollingHitRate,
   xpForLevel,
   xpForReview,
@@ -179,5 +180,42 @@ describe('streak integrity', () => {
     for (const d of days) s = advanceStreak(s, d);
     expect(s.streak).toBe(5);
     expect(s.streakFreezes).toBe(1);
+  });
+});
+
+describe('rebuildStreak — replay the session history', () => {
+  const q = (date: string): SessionLog => session({ date, reviewsDone: 25 });
+
+  it('rebuilds a consecutive qualifying run', () => {
+    const r = rebuildStreak([q('2026-01-01'), q('2026-01-02'), q('2026-01-03')]);
+    expect(r).toEqual({ streak: 3, lastStreakDate: '2026-01-03', streakFreezes: 0 });
+  });
+
+  it('ignores non-qualifying days', () => {
+    const r = rebuildStreak([q('2026-01-01'), session({ date: '2026-01-02', reviewsDone: 3 })]);
+    expect(r).toEqual({ streak: 1, lastStreakDate: '2026-01-01', streakFreezes: 0 });
+  });
+
+  it('a break resets the run — only the latest run survives', () => {
+    const r = rebuildStreak([q('2026-01-01'), q('2026-01-02'), q('2026-01-10'), q('2026-01-11')]);
+    expect(r).toEqual({ streak: 2, lastStreakDate: '2026-01-11', streakFreezes: 0 });
+  });
+
+  it('is order-independent (sorts by date before replaying)', () => {
+    const shuffled = [q('2026-01-03'), q('2026-01-01'), q('2026-01-02')];
+    expect(rebuildStreak(shuffled)).toEqual(rebuildStreak([...shuffled].reverse()));
+    expect(rebuildStreak(shuffled).streak).toBe(3);
+  });
+
+  it('earns and spends freezes exactly as live play would', () => {
+    // 5 consecutive days earn a freeze; the one-day gap then consumes it.
+    const days = ['2026-02-01', '2026-02-02', '2026-02-03', '2026-02-04', '2026-02-05', '2026-02-07'];
+    const r = rebuildStreak(days.map(q));
+    expect(r.streak).toBe(6);
+    expect(r.streakFreezes).toBe(0);
+  });
+
+  it('empty history means no streak', () => {
+    expect(rebuildStreak([])).toEqual({ streak: 0, lastStreakDate: null, streakFreezes: 0 });
   });
 });

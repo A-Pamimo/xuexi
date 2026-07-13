@@ -10,6 +10,7 @@
  * No Firebase here — this is pure data so it's unit-tested in isolation.
  */
 import type { ProgressBlob } from './db/store';
+import { rebuildStreak } from './gamification';
 import type { Card, SessionLog, ToneDrillResult, UserStats } from './types';
 
 /** The more-progressed of two cards for the same word. */
@@ -53,7 +54,7 @@ function mergeToneResults(a: ToneDrillResult[], b: ToneDrillResult[]): ToneDrill
   const seen = new Set<string>();
   const out: ToneDrillResult[] = [];
   for (const r of [...a, ...b]) {
-    const key = `${r.timestamp}|${r.syllable}|${r.speakerId}|${r.chosenTone}`;
+    const key = `${r.timestamp}|${r.syllable}|${r.speakerId}|${r.chosenTone}|${r.correctTone}`;
     if (seen.has(key)) continue;
     seen.add(key);
     out.push(r);
@@ -71,17 +72,19 @@ function mergeCounts(a: Record<number, number>, b: Record<number, number>): Reco
   return out;
 }
 
-function laterDate(a: string | null, b: string | null): string | null {
-  if (!a) return b;
-  if (!b) return a;
-  return a >= b ? a : b;
-}
-
-function mergeStats(a: UserStats, b: UserStats): UserStats {
+function mergeStats(
+  a: UserStats,
+  b: UserStats,
+  mergedSessions: Record<string, SessionLog>,
+): UserStats {
+  // The streak tuple is NOT merged field-wise: max(streak) + later(lastStreakDate)
+  // can pair a stale device's high streak with a fresh date, resurrecting a broken
+  // streak (and max(streakFreezes) refunds spent freezes). Instead, replay the
+  // merged session history — the loss-free record both devices agree on — so a
+  // streak bridged across two devices merges to the combined run, and a genuinely
+  // broken one stays broken.
   return {
-    streak: Math.max(a.streak, b.streak),
-    lastStreakDate: laterDate(a.lastStreakDate, b.lastStreakDate),
-    streakFreezes: Math.max(a.streakFreezes, b.streakFreezes),
+    ...rebuildStreak(Object.values(mergedSessions)),
     totalInputMinutes: Math.max(a.totalInputMinutes, b.totalInputMinutes),
     knownWordCount: Math.max(a.knownWordCount, b.knownWordCount),
     xp: Math.max(a.xp, b.xp),
@@ -98,12 +101,13 @@ function mergeFlags(a: Record<string, boolean>, b: Record<string, boolean>): Rec
 
 /** Combine `local` (the active device — wins for prefs) and `remote` (the cloud copy). */
 export function mergeProgress(local: ProgressBlob, remote: ProgressBlob): ProgressBlob {
+  const sessions = mergeSessions(local.sessions, remote.sessions);
   return {
     onboarded: local.onboarded || remote.onboarded,
     cards: mergeCards(local.cards, remote.cards),
     toneResults: mergeToneResults(local.toneResults, remote.toneResults),
-    sessions: mergeSessions(local.sessions, remote.sessions),
-    stats: mergeStats(local.stats, remote.stats),
+    sessions,
+    stats: mergeStats(local.stats, remote.stats, sessions),
     glossCounts: mergeCounts(local.glossCounts, remote.glossCounts),
     // Device-scoped prefs: the device you're actively on wins.
     themeMode: local.themeMode,

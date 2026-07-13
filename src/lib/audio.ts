@@ -43,9 +43,15 @@ function sourceFor(assetKey: string): number | { uri: string } | null {
 // it (on screen exit / session end) so audio never lingers or stacks.
 let current: Audio.Sound | null = null;
 let generation = 0; // bumped on every stop, so in-flight sequences can bail out
+// A sequence parks on a promise that resolves when its clip finishes; a stop
+// unloads the clip so `didJustFinish` never fires — release the awaiter here
+// or the whole async chain hangs forever.
+let releaseSequence: (() => void) | null = null;
 
 async function stopCurrent(): Promise<void> {
   generation += 1;
+  releaseSequence?.();
+  releaseSequence = null;
   const s = current;
   current = null;
   if (!s) return;
@@ -119,15 +125,20 @@ export async function playSequence(assetKeys: string[]): Promise<boolean> {
       const { sound } = await Audio.Sound.createAsync(source, { shouldPlay: true });
       current = sound;
       playedAny = true;
+      let myRelease: (() => void) | null = null;
       await new Promise<void>((resolve) => {
+        myRelease = resolve;
+        releaseSequence = resolve; // let stopCurrent() cancel this wait
         sound.setOnPlaybackStatusUpdate((status) => {
-          if (status.isLoaded && status.didJustFinish) {
+          if (!status.isLoaded || status.didJustFinish) {
             if (current === sound) current = null;
-            void sound.unloadAsync();
+            if (status.isLoaded) void sound.unloadAsync();
             resolve();
           }
         });
       });
+      // Only clear our own handle — a superseding play may have installed its own.
+      if (releaseSequence === myRelease) releaseSequence = null;
     } catch {
       /* skip a bad clip */
     }

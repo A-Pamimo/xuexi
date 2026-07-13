@@ -152,9 +152,19 @@ fallbacks that a normal dev machine can swap back:
 - Audio generated at build time with [Qwen3-TTS](https://github.com/QwenLM/Qwen3-TTS)
   (Apache-2.0); espeak-ng (GPL) fallback. Generated clips are bundled.
 
+## Accounts & cloud sync (post-MVP, web only)
+
+Google sign-in (Firebase Auth) with loss-free Firestore history sync shipped
+after M5: signing in pulls the cloud copy, merges it with local guest progress
+(`src/lib/mergeProgress.ts` — pure and unit-tested), and pushes the result;
+subsequent changes push on a debounce. Native builds run as a local guest
+(`src/lib/cloud.native.ts` stubs keep Firebase out of the native bundle), and
+the web Firebase SDK is dynamically imported so unconfigured builds never load
+it. The `EXPO_PUBLIC_FIREBASE_*` web config values are not secrets — Firestore
+security rules (auth required, per-UID documents) are the actual access gate.
+
 ## Not in this MVP
 
-Handwriting/speech recognition, social features, accounts/Supabase sync, AI chat
-tutor, iPad layout (spec `<exclude_for_now>`). Polish pass (reanimated
-transitions, richer sound design) is milestone M6; TestFlight + optional Supabase
-sync is M7.
+Handwriting/speech recognition, social features, AI chat tutor, iPad layout
+(spec `<exclude_for_now>`). Polish pass (reanimated transitions, richer sound
+design) is milestone M6; TestFlight + native accounts is M7.
