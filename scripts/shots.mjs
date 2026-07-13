@@ -74,7 +74,7 @@ await page.getByText('START', { exact: true }).waitFor();
 const tab = (name) => page.getByRole('tab', { name });
 await tab('Learn').click();
 await page
-  .getByText('Got it — next →')
+  .getByText('Got it →')
   .or(page.getByText('Show answer'))
   .first()
   .waitFor({ timeout: 6000 });

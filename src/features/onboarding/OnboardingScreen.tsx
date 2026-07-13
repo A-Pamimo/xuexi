@@ -72,7 +72,7 @@ export function OnboardingScreen() {
           <Wordmark text="学习" size={96} color={colors.primary} />
           <H1>Welcome to xuexi</H1>
           <Body dim style={styles.lede}>
-            Learn Mandarin the way your phone already hooks you — swipeable input,
+            Learn Mandarin the way your phone already hooks you: swipeable input,
             tone games, streaks and combos, all pointed at real fluency.
           </Body>
           <Button label="Let's go" variant="seal" onPress={() => setStep(1)} style={styles.cta} />
@@ -115,7 +115,7 @@ export function OnboardingScreen() {
           <DiamondSeal icon={Volume2} size={84} />
           <H1 style={{ marginTop: spacing(1) }}>Train your ears</H1>
           <Body dim style={styles.lede}>
-            High-variability tone training — many speakers, fast rounds — is the
+            Tone training with many speakers and fast rounds is the
             fastest way to make tones stick. Let's play a 60-second round.
           </Body>
           <Button label="Enter the Tone Dojo" variant="seal" onPress={finish} style={styles.cta} />
@@ -204,7 +204,7 @@ function FirstWord({ onDone }: { onDone: () => void }) {
       {correct ? (
         <>
           <Caption style={{ color: colors.good, marginTop: spacing(1.5) }}>
-            Nailed it — 茶 means “tea.”
+            Nailed it. 茶 means “tea.”
           </Caption>
           <Button label="Keep going" variant="seal" onPress={onDone} style={styles.cta} />
         </>
@@ -279,7 +279,7 @@ function FirstSentence({ onDone }: { onDone: () => void }) {
         </View>
       ) : null}
       <Body dim style={styles.lede}>
-        Every word here is one you already know. This is comprehensible input — and
+        Every word here is one you already know. This is comprehensible input, and
         your whole feed will feel exactly like this.
       </Body>
       <Button label="Let's train" variant="seal" onPress={onDone} style={styles.cta} />

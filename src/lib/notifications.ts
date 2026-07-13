@@ -68,7 +68,7 @@ export async function scheduleReminders(prefs: ReminderPrefs): Promise<void> {
     await N.scheduleNotificationAsync({
       content: {
         title: 'Time to learn Chinese',
-        body: 'Keep your streak alive — a few minutes counts.',
+        body: 'Keep your streak alive. A few minutes counts.',
       },
       trigger: {
         type: N.SchedulableTriggerInputTypes.DAILY,

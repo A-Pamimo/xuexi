@@ -159,7 +159,7 @@ export function BuildExercise({
           <Chip key={t.uid} token={t} onPress={() => place(t)} disabled={graded} />
         ))}
         {bank.length === 0 && !graded ? (
-          <Caption>all placed — check your answer</Caption>
+          <Caption>all placed · check your answer</Caption>
         ) : null}
       </View>
 

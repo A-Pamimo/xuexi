@@ -88,7 +88,7 @@ await tab('Learn').click();
 // A fresh session leads with new words ("Got it — next") but may also surface a
 // due review ("Show answer"); accept either so the check isn't state-brittle.
 await page
-  .getByText('Got it — next →')
+  .getByText('Got it →')
   .or(page.getByText('Show answer'))
   .first()
   .waitFor({ timeout: 6000 });

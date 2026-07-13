@@ -3,7 +3,7 @@
  * audio (autoplay on focus), tappable words (tap = gloss + add-to-SRS), and a
  * pinyin toggle. Feed seconds count toward input hours + streak integrity.
  */
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
@@ -53,6 +53,7 @@ type FeedItem = Sentence | typeof DONE_CARD;
 const isDoneCard = (item: FeedItem): item is typeof DONE_CARD => 'kind' in item;
 
 export function FeedScreen() {
+  const router = useRouter();
   const store = useApp((s) => s.store)!;
   const knownWordIds = useApp((s) => s.knownWordIds);
   const dueCount = useApp((s) => s.dueCount);
@@ -121,6 +122,24 @@ export function FeedScreen() {
   // on into the next tab. Focus effect, not unmount: tab screens stay mounted,
   // so only the blur callback actually fires on a tab switch.
   useFocusEffect(useCallback(() => () => void stopAudio(), []));
+
+  // A slow breath on the advance hint: the surface reads as alive and waiting,
+  // without a spinner or a nag. Reduced motion holds a steady mid-opacity.
+  const hintPulse = useRef(new Animated.Value(0.55)).current;
+  useEffect(() => {
+    if (reduce) {
+      hintPulse.setValue(0.8);
+      return;
+    }
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(hintPulse, { toValue: 1, duration: 1200, easing: Easing.inOut(Easing.quad), useNativeDriver: NATIVE_DRIVER }),
+        Animated.timing(hintPulse, { toValue: 0.55, duration: 1200, easing: Easing.inOut(Easing.quad), useNativeDriver: NATIVE_DRIVER }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [reduce, hintPulse]);
 
   // Accumulate feed time while this screen is mounted.
   const secs = useRef(0);
@@ -242,9 +261,20 @@ export function FeedScreen() {
               play={() => { unlockAudio(); return playSentence(store, item); }}
               accessibilityLabel="Play sentence audio"
             />
-            <Caption style={{ marginTop: spacing(3) }}>
+            <Animated.Text
+              style={{
+                opacity: hintPulse,
+                marginTop: spacing(3),
+                fontFamily: fonts.serif,
+                fontSize: 11,
+                letterSpacing: 2,
+                textTransform: 'uppercase',
+                color: colors.textDim,
+                textAlign: 'center',
+              }}
+            >
               {audioLocked ? 'tap the speaker seal to enable audio' : 'tap underlined words · swipe up ↑'}
-            </Caption>
+            </Animated.Text>
           </View>
           )
         )}
@@ -272,7 +302,7 @@ export function FeedScreen() {
           >
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing(1) }}>
               <Caption style={{ color: colors.gold, textAlign: 'center' }}>
-                today's goal is done — keep going or come back tomorrow
+                today's goal is done · keep going or come back tomorrow
               </Caption>
               <X size={12} color={colors.gold} strokeWidth={2.5} />
             </View>
@@ -289,6 +319,9 @@ export function FeedScreen() {
         >
           <StampIcon icon={Settings2} size={16} color={colors.textDim} />
         </Pressable>
+        {/* Quiet chrome: the sentence owns this surface. The pinyin toggle is a
+            small ghost chip (拼), and the due chip is a real shortcut into Learn
+            that hides entirely when nothing is waiting. */}
         <Pressable
           accessibilityRole="switch"
           accessibilityState={{ checked: showPinyin }}
@@ -296,12 +329,20 @@ export function FeedScreen() {
           onPress={() => { unlockAudio(); setShowPinyin(!showPinyin); }}
         >
           <Pill tone={showPinyin ? 'active' : 'default'}>
-            <Body style={{ fontWeight: '700', fontSize: 14 }}>Pinyin {showPinyin ? 'on' : 'off'}</Body>
+            <Caption style={{ fontWeight: '700' }}>拼 {showPinyin ? 'on' : 'off'}</Caption>
           </Pill>
         </Pressable>
-        <Pill>
-          <Caption>due {dueCount()}</Caption>
-        </Pill>
+        {dueCount() > 0 ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`${dueCount()} cards due. Open Learn.`}
+            onPress={() => { juice.tap(); router.push('/reviews'); }}
+          >
+            <Pill>
+              <Caption>{dueCount()} due →</Caption>
+            </Pill>
+          </Pressable>
+        ) : null}
       </View>
 
       {/* Paper-ink progress dots — calm, bounded sense of place in the feed. */}

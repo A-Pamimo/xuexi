@@ -15,7 +15,7 @@ import {
   StyleSheet,
   View,
 } from 'react-native';
-import { X } from 'lucide-react-native';
+import { Check, X } from 'lucide-react-native';
 import { Body, Caption, H2 } from './ui';
 import { ThemeToggle } from './ThemeToggle';
 import { useApp } from '../stores/appStore';
@@ -58,6 +58,12 @@ export function SettingsSheet({ open, onClose }: { open: boolean; onClose: () =>
         <Pressable style={StyleSheet.absoluteFill} accessibilityLabel="Close settings" onPress={onClose} />
       </Animated.View>
       <Animated.View style={[styles.sheet, { transform: [{ translateY }] }]}>
+        {/* Ceremonial double rule along the top edge (spec §3.4: double borders
+            frame ceremonial elements) — the sheet reads as a card laid on paper. */}
+        <View style={styles.doubleRule} pointerEvents="none">
+          <View style={[styles.rule, { height: 2 }]} />
+          <View style={[styles.rule, { height: 1, marginTop: 3 }]} />
+        </View>
         <View style={styles.head}>
           <H2>Settings</H2>
           <Pressable
@@ -94,30 +100,26 @@ export function SettingsSheet({ open, onClose }: { open: boolean; onClose: () =>
   );
 }
 
-/** A calm pill switch matching the paper-ink toggles. */
+/**
+ * The seal checkbox (spec fidelity: never a rounded native toggle). A sharp
+ * square; checked fills with cinnabar and stamps a brush Check in paper ink.
+ */
 function Toggle({ on }: { on: boolean }) {
   const { colors } = useTheme();
   return (
     <View
       style={{
-        width: 48,
-        height: 28,
-        borderRadius: radius.pill,
-        backgroundColor: on ? colors.primary : colors.surfaceAlt,
-        borderWidth: 1,
-        borderColor: on ? colors.primary : colors.border,
+        width: 30,
+        height: 30,
+        borderRadius: radius.sm,
+        borderWidth: 2,
+        borderColor: on ? colors.primary : colors.borderStrong,
+        backgroundColor: on ? colors.primary : 'transparent',
+        alignItems: 'center',
         justifyContent: 'center',
       }}
     >
-      <View
-        style={{
-          width: 22,
-          height: 22,
-          borderRadius: 11,
-          backgroundColor: on ? colors.onPrimary : colors.bgElevated,
-          marginLeft: on ? 23 : 2,
-        }}
-      />
+      {on ? <Check size={19} color={colors.onPrimary} strokeWidth={3} /> : null}
     </View>
   );
 }
@@ -131,8 +133,8 @@ const makeStyles = (c: ThemeColors) =>
       right: 0,
       bottom: 0,
       backgroundColor: c.bg,
-      borderTopLeftRadius: radius.xl,
-      borderTopRightRadius: radius.xl,
+      borderTopLeftRadius: radius.md, // sharp stamp geometry, not a bubbly sheet
+      borderTopRightRadius: radius.md,
       borderTopWidth: 1,
       borderColor: c.border,
       padding: spacing(3),
@@ -141,6 +143,8 @@ const makeStyles = (c: ThemeColors) =>
       ...elevation.modal,
     },
     head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+    doubleRule: { marginBottom: spacing(2) },
+    rule: { backgroundColor: c.borderStrong, width: '100%' },
     close: {
       width: HIT,
       height: HIT,

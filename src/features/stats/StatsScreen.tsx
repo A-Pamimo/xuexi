@@ -267,7 +267,7 @@ function HitRate() {
       </View>
       <ProgressBar value={hr.rate} color={colors.good} />
       <Caption style={{ marginTop: spacing(1) }}>
-        Life happens — a missed day won&apos;t erase your progress, and a freeze protects your streak
+        Life happens. A missed day won&apos;t erase your progress, and a freeze protects your streak
         for 24h.
       </Caption>
     </Card>

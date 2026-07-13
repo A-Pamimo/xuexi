@@ -12,6 +12,7 @@
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Svg, { Circle, Text as SvgText } from 'react-native-svg';
+import { Check } from 'lucide-react-native';
 import { useTheme } from '../lib/appearance';
 import { useReducedMotion } from '../lib/motion';
 import { spacing } from '../theme';
@@ -85,23 +86,32 @@ export function DailyGoalRing({ ratio, into, goal, met, size = 120 }: DailyGoalR
           strokeDashoffset={circumference * (1 - fill)}
           transform={`rotate(-90 ${cx} ${cy})`}
         />
-        {/* Center label: ✓ when met, otherwise into/goal. */}
-        <SvgText
-          x={cx}
-          y={cy}
-          fill={met ? arc : colors.text}
-          fontSize={met ? size * 0.34 : size * 0.2}
-          fontWeight="800"
-          textAnchor="middle"
-          alignmentBaseline="central"
-        >
-          {met ? '✓' : `${into}/${goal}`}
-        </SvgText>
+        {/* Center label while in progress; the met state gets the lucide Check
+            below (the same glyph as the completion seal, not a system ✓). */}
+        {!met ? (
+          <SvgText
+            x={cx}
+            y={cy}
+            fill={colors.text}
+            fontSize={size * 0.2}
+            fontWeight="800"
+            textAnchor="middle"
+            alignmentBaseline="central"
+          >
+            {`${into}/${goal}`}
+          </SvgText>
+        ) : null}
       </Svg>
+      {met ? (
+        <View style={[StyleSheet.absoluteFillObject, styles.center]} pointerEvents="none">
+          <Check size={size * 0.34} color={arc} strokeWidth={3} />
+        </View>
+      ) : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   wrap: { alignItems: 'center', justifyContent: 'center', marginVertical: spacing(1) },
+  center: { alignItems: 'center', justifyContent: 'center' },
 });

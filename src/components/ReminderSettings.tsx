@@ -85,7 +85,7 @@ export function ReminderSettings() {
 
       {nativeOnly ? (
         <Caption style={{ marginTop: spacing(1) }}>
-          Reminders are delivered on the mobile app — the web version can&apos;t schedule
+          Reminders are delivered on the mobile app; the web version can&apos;t schedule
           notifications.
         </Caption>
       ) : null}

@@ -179,7 +179,7 @@ export function ToneDojoScreen() {
         <H1 style={{ marginTop: spacing(1) }}>Tone Dojo</H1>
         <Body dim style={{ textAlign: 'center', marginVertical: spacing(2), maxWidth: 320 }}>
           Hear a syllable, tap its tone before the bar empties. Many speakers,
-          fast rounds. 60 seconds — go!
+          fast rounds. 60 seconds. Go!
         </Body>
         <Button label="Start" variant="seal" onPress={start} style={{ alignSelf: 'stretch' }} />
       </Screen>
@@ -322,7 +322,7 @@ function ToneBreakdown() {
             Tone {r.tone} · {TONE_NAMES[r.tone - 1]}
           </Body>
           <Body dim style={{ fontSize: 14 }}>
-            {r.pct === null ? '—' : `${Math.round(r.pct * 100)}%`}
+            {r.pct === null ? '·' : `${Math.round(r.pct * 100)}%`}
             {r.delta !== null && Math.abs(r.delta) >= 0.01
               ? ` ${r.delta > 0 ? '▲' : '▼'}${Math.abs(Math.round(r.delta * 100))}`
               : ''}

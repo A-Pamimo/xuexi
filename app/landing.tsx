@@ -17,9 +17,9 @@ import { useTheme } from '../src/lib/appearance';
 import { fonts, radius, spacing } from '../src/theme';
 
 const FEATURES: { icon: LucideIcon; title: string; body: string }[] = [
-  { icon: Layers, title: 'A calm feed', body: 'Swipeable sentences you can already almost read — comprehensible input, no doomscroll.' },
-  { icon: Mic2, title: 'Train your ear', body: 'Fast tone-dojo rounds with many voices — the proven way to make tones stick.' },
-  { icon: Sparkles, title: 'Honest progress', body: 'Real spaced repetition, streaks and input-hours — dopamine pointed at actual fluency.' },
+  { icon: Layers, title: 'A calm feed', body: 'Swipeable sentences you can already almost read. Comprehensible input, no doomscroll.' },
+  { icon: Mic2, title: 'Train your ear', body: 'Fast tone-dojo rounds with many voices, the proven way to make tones stick.' },
+  { icon: Sparkles, title: 'Honest progress', body: 'Real spaced repetition, streaks and input-hours. Dopamine pointed at actual fluency.' },
 ];
 
 export default function Landing() {
@@ -55,8 +55,8 @@ export default function Landing() {
           <Wordmark text="学习" size={88} color={colors.primary} />
           <Caption style={{ letterSpacing: 4, marginTop: spacing(1) }}>XUÉ XÍ</Caption>
           <Body style={styles.tagline}>
-            A calm, literary way to actually learn Mandarin — built from the habits that already
-            hook you, pointed at real fluency.
+            A calm, literary way to actually learn Mandarin, built from the habits that already
+            hook you and pointed at real fluency.
           </Body>
         </View>
 
@@ -76,7 +76,7 @@ export default function Landing() {
           <Button label="Get started" variant="seal" onPress={() => router.push('/onboarding')} style={{ alignSelf: 'stretch' }} />
           <GoogleButton style={{ alignSelf: 'stretch', marginTop: spacing(1.5) }} />
           <Caption style={{ textAlign: 'center', marginTop: spacing(2) }}>
-            No account needed — sign in only to save & sync across devices.
+            No account needed. Sign in only to save & sync across devices.
           </Caption>
         </View>
       </ScrollView>

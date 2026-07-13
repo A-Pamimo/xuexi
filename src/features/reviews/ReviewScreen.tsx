@@ -173,7 +173,7 @@ export function ReviewScreen() {
         <DiamondSeal icon={Check} size={84} />
         <H1 style={{ marginTop: spacing(1) }}>Session complete</H1>
         <Body dim style={{ marginTop: spacing(1), textAlign: 'center' }}>
-          The ink is dry — every mark stays.
+          The ink is dry. Every mark stays.
         </Body>
         <Body dim style={{ marginTop: spacing(0.5), textAlign: 'center' }}>
           Learned {learned} new · reviewed {reviewed} · +{gainedXp} XP
@@ -361,7 +361,7 @@ export function ReviewScreen() {
       <View style={{ flex: 1 }} />
 
       {isNew ? (
-        <Button label="Got it — next →" variant="good" onPress={learnDone} />
+        <Button label="Got it →" variant="good" onPress={learnDone} />
       ) : revealed ? (
         <View style={styles.ratings}>
           {RATINGS.map((r) => (
