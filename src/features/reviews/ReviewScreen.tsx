@@ -8,7 +8,7 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
-import { Check } from 'lucide-react-native';
+import { Check, Flame, RotateCcw, Sparkles, Star } from 'lucide-react-native';
 import { Body, Button, Caption, Card, H1, Label, PlaqueButton, PlayButton, ProgressBar, Screen } from '../../components/ui';
 import { DiamondSeal } from '../../components/DiamondSeal';
 import { Hanzi, Pinyin } from '../../components/chinese';
@@ -108,7 +108,7 @@ export function ReviewScreen() {
   const [gainedXp, setGainedXp] = useState(0);
   const [learned, setLearned] = useState(0);
   const [reviewed, setReviewed] = useState(0);
-  const [flash, setFlash] = useState<string | null>(null);
+  const [flash, setFlash] = useState<{ text: string; golden: boolean } | null>(null);
 
   // One tracked timer for the reward flash: rating faster than the 700ms decay
   // must not leave stale timers behind to clear the NEXT card's flash.
@@ -210,7 +210,7 @@ export function ReviewScreen() {
       else juice.correct();
       if (reward.multiplier > 1) {
         juice.reward();
-        setFlash(`${reward.golden ? '🌟' : '🔥'} combo ${nextCombo} · ${reward.multiplier}× XP!`);
+        setFlash({ text: `combo ×${nextCombo} · ${reward.multiplier}× XP`, golden: reward.golden });
       }
     } else {
       setCombo(0);
@@ -234,7 +234,7 @@ export function ReviewScreen() {
       setMaxCombo((m) => Math.max(m, nextCombo));
       if (reward.multiplier > 1) {
         juice.reward();
-        setFlash(`${reward.golden ? '🌟' : '🔥'} combo ${nextCombo} · ${reward.multiplier}× XP!`);
+        setFlash({ text: `combo ×${nextCombo} · ${reward.multiplier}× XP`, golden: reward.golden });
       }
     } else {
       setCombo(0);
@@ -257,9 +257,16 @@ export function ReviewScreen() {
     <Screen ambient>
       <View style={styles.header}>
         <View style={styles.headerStatus}>
-          <Caption>
-            {isNew ? '✨ Learn' : '🔁 Review'} · {idx + 1}/{queue.length}
-          </Caption>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing(0.5) }}>
+            {isNew ? (
+              <Sparkles size={12} color={colors.accent} strokeWidth={2.25} />
+            ) : (
+              <RotateCcw size={12} color={colors.textDim} strokeWidth={2.25} />
+            )}
+            <Caption>
+              {isNew ? 'Learn' : 'Review'} · {idx + 1}/{queue.length}
+            </Caption>
+          </View>
           <View style={{ marginTop: spacing(1) }}>
             {isNew ? <Caption>learning</Caption> : <ComboMeter combo={combo} />}
           </View>
@@ -281,7 +288,7 @@ export function ReviewScreen() {
       </View>
       {!isNew && combo >= 5 ? (
         <View style={{ marginTop: spacing(1) }}>
-          <Ticker text={`🔥 COMBO ×${combo}    `} color={colors.gold} size={14} speed={70} />
+          <Ticker text={`COMBO ×${combo} · KEEP IT ALIVE    `} color={colors.gold} size={14} speed={70} />
         </View>
       ) : null}
 
@@ -341,8 +348,13 @@ export function ReviewScreen() {
       )}
 
       {flash ? (
-        <View style={styles.flash}>
-          <Body style={{ color: colors.gold, fontWeight: '800', fontSize: font.title }}>{flash}</Body>
+        <View style={[styles.flash, { flexDirection: 'row', gap: spacing(1) }]}>
+          {flash.golden ? (
+            <Star size={20} color={colors.gold} strokeWidth={2.25} />
+          ) : (
+            <Flame size={20} color={colors.gold} strokeWidth={2.25} />
+          )}
+          <Body style={{ color: colors.gold, fontWeight: '800', fontSize: font.title }}>{flash.text}</Body>
         </View>
       ) : null}
 
@@ -426,10 +438,11 @@ function ComboMeter({ combo }: { combo: number }) {
   const bg = milestone ? colors.accent : colors.primaryDim;
   return (
     <View
-      style={[styles.combo, { backgroundColor: bg }]}
+      style={[styles.combo, { backgroundColor: bg, flexDirection: 'row', alignItems: 'center', gap: spacing(0.5) }]}
       accessibilityLabel={`Combo ${combo}${milestone ? ', on fire' : ''}`}
     >
-      <Body style={{ fontWeight: '800', color: readableOn(bg), fontSize: 14 }}>🔥 {combo}</Body>
+      <Flame size={13} color={readableOn(bg)} strokeWidth={2.5} />
+      <Body style={{ fontWeight: '800', color: readableOn(bg), fontSize: 14 }}>{combo}</Body>
     </View>
   );
 }

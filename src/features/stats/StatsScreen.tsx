@@ -6,7 +6,7 @@
 import React, { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import Svg, { Rect } from 'react-native-svg';
-import { Clock } from 'lucide-react-native';
+import { Clock, Flame, Shield, type LucideIcon } from 'lucide-react-native';
 import { StampIcon } from '../../components/StampIcon';
 import { Body, Caption, Card, Display, H1, H2, ProgressBar, Screen } from '../../components/ui';
 import { Hanzi, Pinyin } from '../../components/chinese';
@@ -47,9 +47,9 @@ export function StatsScreen() {
         <FeaturedWord />
 
         <View style={styles.rowStats}>
-          <Stat big={`${stats.streak}`} label="🔥 day streak" />
+          <Stat big={`${stats.streak}`} label="day streak" icon={Flame} />
           <Stat big={`${knownCount}`} label="words known" />
-          <Stat big={`${stats.streakFreezes}`} label="🛡️ protection" />
+          <Stat big={`${stats.streakFreezes}`} label="protection" icon={Shield} />
         </View>
 
         <HitRate />
@@ -274,11 +274,18 @@ function HitRate() {
   );
 }
 
-function Stat({ big, label }: { big: string; label: string }) {
+function Stat({ big, label, icon: Icon }: { big: string; label: string; icon?: LucideIcon }) {
+  const { colors } = useTheme();
   return (
     <Card style={styles.stat}>
-      <Body style={{ fontSize: 28, fontWeight: '900' }}>{big}</Body>
-      <Caption style={{ textAlign: 'center' }}>{label}</Caption>
+      {/* Brush numerals (spec §3.3: scores & big numbers in the display face). */}
+      <Text style={{ fontFamily: fonts.calligraphy, fontSize: 36, lineHeight: 40, color: colors.text }}>
+        {big}
+      </Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing(0.5) }}>
+        {Icon ? <Icon size={12} color={colors.textDim} strokeWidth={2.25} /> : null}
+        <Caption style={{ textAlign: 'center' }}>{label}</Caption>
+      </View>
     </Card>
   );
 }
@@ -306,7 +313,9 @@ const styles = StyleSheet.create({
     letterSpacing: 1.5,
   },
   heroNumRow: { flexDirection: 'row', alignItems: 'flex-end', gap: spacing(1) },
-  heroNum: { color: HERO_TEXT, fontFamily: fonts.displayBold, fontSize: 60, lineHeight: 62 },
+  // Brush-ink hero numeral — the one place the calligraphy face carries a number
+  // at full size (spec §3.3: "scores and big numbers" in the display family).
+  heroNum: { color: HERO_TEXT, fontFamily: fonts.calligraphy, fontSize: 64, lineHeight: 68 },
   heroUnit: { color: HERO_DIM, fontFamily: fonts.sans, fontSize: 16, paddingBottom: spacing(1) },
   // Square-ruled milestone bar (a bordered channel with a hairline paper gap),
   // echoing the double rule of the seal buttons.

@@ -427,11 +427,18 @@ const styles = StyleSheet.create({
     minHeight: HIT,
     paddingVertical: spacing(1.5),
     paddingHorizontal: spacing(3),
-    borderRadius: radius.pill,
+    // Carved-seal geometry, not a bubble — pill radius is reserved for genuinely
+    // circular elements (play button, goal ring, avatar).
+    borderRadius: radius.md,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  btnLabel: { fontSize: font.body, fontWeight: '800', fontFamily: fonts.sansBold },
+  btnLabel: {
+    fontSize: font.body,
+    fontWeight: '700',
+    fontFamily: fonts.serif, // one button voice app-wide (seal/plaque are serif too)
+    letterSpacing: 1,
+  },
   seal: {
     minHeight: HIT,
     padding: 3, // the paper gap between the double rules

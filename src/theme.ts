@@ -133,9 +133,10 @@ export const radius = { sm: 2, md: 4, lg: 6, xl: 10, pill: 999 } as const;
  * in app/_layout.tsx. RN ignores numeric fontWeight for custom families, so the
  * weight is baked into the family name and applied via fontFamily. Roles:
  * `sans` (Inter, UI), `serif` (Noto Serif SC — content hanzi AND English
- * headings/numerals), and `calligraphy` (Ma Shan Zheng — decorative hanzi
- * WORDMARKS only; it's a Chinese-only brush font with poor Latin coverage and
- * low small-size legibility, so it never touches content hanzi or Latin text).
+ * headings), and `calligraphy` (Ma Shan Zheng — decorative hanzi WORDMARKS and
+ * BIG NUMERALS ≥30px, per spec §3.3 "scores and big numbers"; its Latin/digit
+ * glyphs are brush-drawn but rough at small sizes, so it never carries body
+ * text, labels, or content hanzi).
  */
 export const fonts = {
   sans: 'Inter_500Medium',

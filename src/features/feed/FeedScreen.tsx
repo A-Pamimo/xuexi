@@ -17,7 +17,7 @@ import {
   type ViewToken,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Check, Settings2 } from 'lucide-react-native';
+import { Check, Settings2, X } from 'lucide-react-native';
 import { Body, Button, Caption, H1, Pill, PlayButton, Screen } from '../../components/ui';
 import { Hanzi, Pinyin } from '../../components/chinese';
 import { DiamondSeal } from '../../components/DiamondSeal';
@@ -252,7 +252,7 @@ export function FeedScreen() {
 
       {streak >= 3 ? (
         <View style={styles.streakRibbon} pointerEvents="none">
-          <Ticker text={`🔥 ${streak}-DAY STREAK · KEEP IT ALIVE    `} color={colors.gold} size={13} speed={60} />
+          <Ticker text={`${streak}-DAY STREAK · KEEP IT ALIVE    `} color={colors.gold} size={13} speed={60} />
         </View>
       ) : null}
 
@@ -270,9 +270,12 @@ export function FeedScreen() {
             accessibilityLabel="Today's goal is done. Dismiss."
             onPress={() => { juice.tap(); setGoalBannerDismissed(true); }}
           >
-            <Caption style={{ color: colors.gold, textAlign: 'center' }}>
-              🎉 today's goal is done — keep going or come back tomorrow  ✕
-            </Caption>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing(1) }}>
+              <Caption style={{ color: colors.gold, textAlign: 'center' }}>
+                today's goal is done — keep going or come back tomorrow
+              </Caption>
+              <X size={12} color={colors.gold} strokeWidth={2.5} />
+            </View>
           </Pressable>
         </View>
       ) : null}
@@ -368,6 +371,7 @@ function GlossPeek({
   onAdd: () => void;
   onClose: () => void;
 }) {
+  const { colors } = useTheme();
   // Keep the last word around while animating out so its content is drawn.
   const [shown, setShown] = useState<Word | null>(word);
   const anim = useRef(new Animated.Value(word ? 1 : 0)).current;
@@ -416,7 +420,7 @@ function GlossPeek({
           hitSlop={12}
           onPress={onClose}
         >
-          <Caption>✕</Caption>
+          <X size={14} color={colors.textDim} strokeWidth={2.5} />
         </Pressable>
       </View>
       <View style={styles.peekActions}>

@@ -7,7 +7,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useFocusEffect } from 'expo-router';
 import { Pressable, StyleSheet, View } from 'react-native';
-import { Award, Volume2 } from 'lucide-react-native';
+import { Award, Flame, Mic2, Timer, Volume2 } from 'lucide-react-native';
 import { Body, Button, Caption, H1, PlaqueCorners, PlayButton, ProgressBar, Screen } from '../../components/ui';
 import { DiamondSeal } from '../../components/DiamondSeal';
 import { ScrambleText } from '../../components/ScrambleText';
@@ -138,9 +138,12 @@ export function ToneDojoScreen() {
         juice.wrong();
       }
       if (advanceTimer.current) clearTimeout(advanceTimer.current);
+      // Hold the answer (pinyin + contour) on screen long enough to actually
+      // read it — and noticeably longer after a miss, when the learner needs to
+      // study the correct tone rather than be rushed into the next syllable.
       advanceTimer.current = setTimeout(() => {
         if (Date.now() - questionStart.current < SESSION_MS) nextQuestion();
-      }, 650);
+      }, correct ? 1000 : 1900);
     },
     [q, recordTone, nextQuestion],
   );
@@ -203,10 +206,19 @@ export function ToneDojoScreen() {
   return (
     <Screen ambient>
       <View style={styles.top}>
-        <Body dim>⏱ {Math.ceil(sessionLeft / 1000)}s</Body>
-        <Body style={{ fontWeight: '800', color: combo >= 10 ? colors.accent : colors.text }}>
-          {score.correct}/{score.total} · 🔥{combo}
-        </Body>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing(0.75) }}>
+          <Timer size={14} color={colors.textDim} strokeWidth={2.25} />
+          <Body dim style={{ fontVariant: ['tabular-nums'] }}>{Math.ceil(sessionLeft / 1000)}s</Body>
+        </View>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing(0.5) }}>
+          <Body style={{ fontWeight: '800', fontVariant: ['tabular-nums'], color: colors.text }}>
+            {score.correct}/{score.total} ·
+          </Body>
+          <Flame size={14} color={combo >= 10 ? colors.accent : colors.textDim} strokeWidth={2.25} />
+          <Body style={{ fontWeight: '800', fontVariant: ['tabular-nums'], color: combo >= 10 ? colors.accent : colors.text }}>
+            {combo}
+          </Body>
+        </View>
       </View>
 
       {/* per-question timer bar */}
@@ -217,12 +229,15 @@ export function ToneDojoScreen() {
           color={qProgress < 0.3 ? colors.bad : colors.primary}
         />
       </View>
-      <Caption style={{ marginTop: spacing(0.5) }}>
-        🎙️ {voiceTier} of 3 voices{voiceTier < 3 ? ' · widens as you improve' : ' · full variability'}
-      </Caption>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing(0.5), marginTop: spacing(0.5) }}>
+        <Mic2 size={12} color={colors.textDim} strokeWidth={2.25} />
+        <Caption>
+          {voiceTier} of 3 voices{voiceTier < 3 ? ' · widens as you improve' : ' · full variability'}
+        </Caption>
+      </View>
       {combo >= 5 ? (
         <View style={{ marginTop: spacing(1) }}>
-          <Ticker text={`🔥 COMBO ×${combo}    `} color={colors.gold} size={14} speed={70} />
+          <Ticker text={`COMBO ×${combo} · KEEP IT ALIVE    `} color={colors.gold} size={14} speed={70} />
         </View>
       ) : null}
 

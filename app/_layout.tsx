@@ -13,6 +13,7 @@ import { Inter_700Bold } from '@expo-google-fonts/inter/700Bold';
 import { Inter_800ExtraBold } from '@expo-google-fonts/inter/800ExtraBold';
 import { NotoSerifSC_500Medium } from '@expo-google-fonts/noto-serif-sc/500Medium';
 import { MaShanZheng_400Regular } from '@expo-google-fonts/ma-shan-zheng/400Regular';
+import { Frown } from 'lucide-react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Body, Loading, Screen } from '../src/components/ui';
@@ -90,7 +91,7 @@ export default function RootLayout() {
           </Stack>
         ) : initError ? (
           <Screen center>
-            <Body style={{ fontSize: 40 }}>😕</Body>
+            <Frown size={40} color={colors.textDim} strokeWidth={1.75} />
             <Body style={{ textAlign: 'center', marginTop: 12 }}>
               Couldn&apos;t load xuexi. Please reload the app.
             </Body>
