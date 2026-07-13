@@ -99,16 +99,18 @@ export class Store {
     this.wordById = new Map(seed.words.map((w) => [w.id, w]));
   }
 
-  static async open(): Promise<Store> {
+  /** `persistence` is injectable for tests; production always uses the platform adapter. */
+  static async open(persistence: Persistence = getPersistence()): Promise<Store> {
     const seed = rawSeed as unknown as Seed;
-    const persistence = getPersistence();
     const store = new Store(seed, persistence);
     const saved = await persistence.load();
     if (saved) {
       try {
         store.progress = { ...emptyProgress(), ...(JSON.parse(saved) as ProgressBlob) };
       } catch {
-        /* corrupt blob — start fresh */
+        // Last resort — persistence already fell back to the .bak copy, so
+        // reaching here means both copies were unreadable.
+        console.warn('xuexi: progress blob unreadable — starting fresh');
       }
     }
     return store;

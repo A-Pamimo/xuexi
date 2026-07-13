@@ -85,6 +85,9 @@ export function retrievabilityOf(card: Card, now: Date = new Date()): number {
 // --- conversion between domain Card and ts-fsrs Card -----------------------
 
 function toFsrs(card: Card): FsrsCard {
+  // elapsed_days/scheduled_days are bookkeeping ts-fsrs recomputes from
+  // last_review during next(); they only feed the fuzz window, which is
+  // disabled above. If fuzz is ever enabled, derive them from the card here.
   return {
     due: new Date(card.due),
     stability: card.stability,
@@ -95,8 +98,7 @@ function toFsrs(card: Card): FsrsCard {
     lapses: card.lapses,
     state: card.state as State,
     last_review: card.lastReview ? new Date(card.lastReview) : undefined,
-    learning_steps: 0,
-  } as FsrsCard;
+  };
 }
 
 function fromFsrs(

@@ -35,8 +35,15 @@ import { scheduleReminders, type ReminderPrefs } from '../lib/notifications';
 import { applyRating, isKnown, newCard, retrievabilityOf, selectDue } from '../lib/srs';
 import type { Card, Rating, ThemeMode, ToneDrillResult, UserStats, Word } from '../lib/types';
 
+/**
+ * The LOCAL calendar date (YYYY-MM-DD). Streaks, daily goals and session logs
+ * all key off this — it must match the learner's wall clock, not UTC (a user
+ * in UTC+8 studying before 8am would otherwise be credited to yesterday).
+ */
 export function today(d: Date = new Date()): string {
-  return d.toISOString().slice(0, 10);
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${d.getFullYear()}-${m}-${day}`;
 }
 
 // Highest-frequency HSK1 words used to bootstrap a "known" base at onboarding so
@@ -369,8 +376,12 @@ export const useApp = create<AppState>((set, get) => ({
       ...store.getStats(),
       totalInputMinutes: store.getStats().totalInputMinutes + sec / 60,
     };
-    store.setStats(stats);
-    set({ stats });
+    // Same streak re-check as addFeedSeconds: drill time itself doesn't qualify
+    // a day, but the review threshold may have been crossed earlier today.
+    const streaked = maybeStreak(store, stats, day);
+    store.setStats(streaked);
+    set({ stats: streaked });
+    get().bump();
   },
 }));
 
