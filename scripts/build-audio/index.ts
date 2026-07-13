@@ -262,7 +262,51 @@ function synthQwen(jobs: Job[]): number {
     if (!fs.existsSync(p)) throw new Error(`Qwen did not produce ${j.ref.assetKey}`);
     bytes += fs.statSync(p).size;
   }
+  flagRunawayClips(jobs);
   return bytes;
+}
+
+/**
+ * Neural TTS occasionally "runs away" on short inputs — repeating a syllable or
+ * trailing off into breathy filler (the 我们 clip came out 2.2 s of three bursts,
+ * heard as a moan). These are unusable but pass the exists-check. Flag any clip
+ * far longer than its text warrants so a maintainer can delete + re-synth just
+ * those (qwen_synth skips existing files, so `rm` + re-run regenerates them).
+ * A soft warning, not a hard fail: a partial bundle is still better than none.
+ */
+function flagRunawayClips(jobs: Job[]): void {
+  const SECONDS_PER_CHAR = 0.5; // generous ceiling for a citation-tone syllable
+  const FLOOR = 0.9; // even a single char shouldn't exceed ~0.9 s
+  const bad: { key: string; text: string; dur: number; max: number }[] = [];
+  for (const j of jobs) {
+    const p = path.join(OUT, j.ref.assetKey);
+    if (!fs.existsSync(p)) continue;
+    const dur = wavDurationSeconds(p);
+    const max = Math.max(FLOOR, [...j.text].length * SECONDS_PER_CHAR);
+    if (dur > max) bad.push({ key: j.ref.assetKey, text: j.text, dur, max });
+  }
+  if (bad.length === 0) return;
+  const list = path.join(OUT, '_runaway-clips.txt');
+  fs.writeFileSync(
+    list,
+    bad
+      .sort((a, b) => b.dur - a.dur)
+      .map((b) => `${b.key}\t${b.text}\t${b.dur.toFixed(2)}s (max ${b.max.toFixed(2)}s)`)
+      .join('\n') + '\n',
+  );
+  process.stdout.write(
+    `  ⚠ ${bad.length} runaway clip(s) exceed the length budget — see ${path.relative(ROOT, list)};\n` +
+      `    delete those .wav files and re-run to regenerate them.\n`,
+  );
+}
+
+/** Duration of a PCM WAV from its header (bytes-per-second in the fmt chunk). */
+function wavDurationSeconds(p: string): number {
+  const b = fs.readFileSync(p);
+  if (b.length < 44 || b.toString('ascii', 0, 4) !== 'RIFF') return 0;
+  const byteRate = b.readUInt32LE(28); // sampleRate * channels * bytesPerSample
+  const dataBytes = b.length - 44; // canonical 44-byte header
+  return byteRate > 0 ? dataBytes / byteRate : 0;
 }
 
 function main() {

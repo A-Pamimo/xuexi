@@ -248,8 +248,9 @@ export const useApp = create<AppState>((set, get) => ({
 
   // A session = a capped batch of NEW words to learn (taught first) followed by
   // the due reviews. Capping new items (research P1-2 load protection) keeps the
-  // intro gradual; new words arrive in SPOKEN-frequency order (P0-1) so learners
-  // meet the words that dominate real speech first — basics first, then progress.
+  // intro gradual; new words arrive by LEARN PRIORITY (spoken-frequency with bare
+  // grammatical particles deferred, byLearnPriority) so learners meet meaningful,
+  // teachable words first rather than abstract markers — basics first, then grammar.
   reviewQueue(limit = 20, maxNew = 8) {
     const store = requireStore(get().store);
     const cards = store.allCards();
@@ -271,7 +272,7 @@ export const useApp = create<AppState>((set, get) => ({
       const w = store.getWord(c.wordId);
       if (w) newItems.push({ word: w, card: c, isNew: true });
     }
-    const fresh = store.words.filter((w) => !carded.has(w.id)).sort(bySpokenFreq);
+    const fresh = store.words.filter((w) => !carded.has(w.id)).sort(byLearnPriority);
     for (const w of fresh) {
       if (newItems.length >= maxNew) break;
       newItems.push({ word: w, card: newCard(w.id), isNew: true });
@@ -394,6 +395,35 @@ function countKnown(store: Store): number {
 /** Order words by SUBTLEX-CH spoken-frequency rank; unranked words sort last. */
 export function bySpokenFreq(a: Word, b: Word): number {
   return (a.spokenFreqRank ?? Infinity) - (b.spokenFreqRank ?? Infinity);
+}
+
+// Pure grammatical particles/markers. Essential Mandarin, but they carry no
+// standalone meaning — as isolated flashcards ("了 = completed-action marker")
+// they teach nothing, which is why raw spoken-frequency order (which puts them
+// among the very first words) is pedagogically backwards for a beginner. We still
+// introduce them early, just not as the first cards, and the Learn card now always
+// shows them inside an example sentence (ReviewScreen ExampleSentence).
+const PARTICLE_HANZI = new Set([
+  '了', '着', '过', '的', '地', '得', '吧', '吗', '呢', '啊', '们', '被', '把', '之', '而', '以',
+]);
+// How far behind their raw frequency rank particles get pushed — enough that a
+// learner's opening cards are contentful (nouns/verbs/adjectives), while the
+// particle still surfaces within the first handful of sessions.
+const PARTICLE_RANK_PENALTY = 60;
+
+function learnRank(w: Word): number {
+  const base = w.spokenFreqRank ?? Number.POSITIVE_INFINITY;
+  return PARTICLE_HANZI.has(w.hanzi) ? base + PARTICLE_RANK_PENALTY : base;
+}
+
+/**
+ * Order NEW words for introduction: spoken-frequency backbone (P0-1) with bare
+ * grammatical particles deferred so beginners meet meaningful, teachable words
+ * first. Keeps the frequency evidence while fixing the "abstract markers as your
+ * first words" misalignment.
+ */
+export function byLearnPriority(a: Word, b: Word): number {
+  return learnRank(a) - learnRank(b);
 }
 
 function maybeStreak(store: Store, stats: UserStats, day: string): UserStats {
